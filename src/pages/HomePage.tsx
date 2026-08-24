@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { LiveFigure } from "../components/LiveFigure";
 import { DIAGRAM_CASES, DEFAULT_CASE_ID, caseById } from "../lib/cases";
 import { derivePrisma } from "../lib/prisma";
+import { HOME_META } from "../seo";
 
 export function HomePage() {
   const [activeId, setActiveId] = useState(DEFAULT_CASE_ID);
@@ -10,20 +11,21 @@ export function HomePage() {
   const stats = useMemo(() => derivePrisma(active.input()), [active]);
 
   useEffect(() => {
-    document.title = "Create a PRISMA 2020 flow diagram — Diagrflow";
+    document.title = HOME_META.title;
     const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute("href", "https://diagrflow.com/");
+    if (canonical) canonical.setAttribute("href", HOME_META.canonical);
   }, []);
 
   return (
     <main>
       <section className="workbench shell">
         <div>
-          <h1>PRISMA 2020 from your counts</h1>
+          <h1>Create a PRISMA 2020 flow diagram from your counts</h1>
           <p className="lede">
-            Type identification, screening, eligibility, and included numbers. The
-            official boxes update as you type. Export SVG or PNG with no watermark
-            for a manuscript figure.
+            Use Diagrflow to create a PRISMA flow diagram for a systematic review.
+            Type identification, screening, eligibility, and included numbers from
+            your search log. Official boxes update as you type. Export SVG or PNG
+            with no watermark and put the file in the manuscript.
           </p>
           <div className="actions">
             <Link className="btn btn-primary" to={`/editor?case=${active.id}`}>
@@ -32,13 +34,89 @@ export function HomePage() {
             <Link className="btn btn-ghost" to="/editor">
               Start blank
             </Link>
+            <Link className="btn btn-ghost" to="/pricing">
+              Pricing
+            </Link>
           </div>
           <p className="fine">
             Free during the MVP. No account. Cite Page et al., BMJ 2021;372:n71 in
             the figure legend. Diagrflow is not affiliated with prisma-statement.org.
+            See <Link to="/pricing">pricing</Link> or open the{" "}
+            <Link to="/editor">editor</Link>.
           </p>
         </div>
         <LiveFigure diagramCase={active} />
+      </section>
+
+      <section className="copy shell" id="create-prisma-flow-diagram">
+        <h2>How to create a PRISMA flow diagram</h2>
+        <p>
+          A PRISMA 2020 flow diagram reports how records moved from identification
+          through screening to the studies and reports included in a systematic
+          review. Journals that follow the PRISMA 2020 statement expect that figure
+          in new submissions. Diagrflow is a focused editor for that figure: you
+          enter counts, the official boxes redraw, and you export a file. It is not
+          a general drawing canvas and it does not invent numbers for you.
+        </p>
+        <p>
+          Start from a search log, not from a sketch. You need records identified
+          from databases and, if you searched them, from registers; records removed
+          before screening (duplicates, and the optional grey-box lines if they
+          apply); records screened and excluded; reports sought for retrieval and
+          reports not retrieved; reports assessed for eligibility with itemised
+          exclusion reasons; and the two included counts — studies included in the
+          review, and reports of included studies. Those last two numbers are
+          different in PRISMA 2020. If you also identified reports from websites,
+          organisations, or citation searching, use the other-methods column
+          instead of folding those records into the database total.
+        </p>
+        <p>
+          Open the <Link to="/editor">editor</Link>, type the counts, and watch
+          identification, screening, and included boxes update. Balance checks flag
+          totals that do not reconcile so you can correct the log before export.
+          When the figure matches the log, download SVG or PNG. There is no
+          watermark on the working export. Authors may use the file in a journal
+          submission. Keep the PRISMA 2020 citation in the figure legend. The{" "}
+          <Link to="/pricing">pricing</Link> page states the current MVP terms:
+          the editor and exports are free, and there is no payment form.
+        </p>
+        <h3>Enter counts from the search log</h3>
+        <p>
+          Identification is not a single combined total. PRISMA 2020 separates
+          bibliographic databases from trial registers. You may add optional
+          per-database lines under that box. Records removed before screening can
+          include duplicates, records marked ineligible by automation tools, and
+          other removals. Hide a grey box when that line does not apply; do not
+          zero it as if you measured it. Screening then reports records screened,
+          records excluded (optionally split between human and automation
+          decisions), reports sought for retrieval, reports not retrieved, and
+          reports assessed for eligibility. Exclusion reasons at full text should
+          be itemised. Included reports the study count and the report count
+          separately.
+        </p>
+        <h3>Check the figure against PRISMA 2020</h3>
+        <p>
+          Box labels follow the official new-review templates, including the
+          record / report / study distinction. That wording is part of the
+          reporting standard, not decoration. If a line does not apply to your
+          review, omit it rather than inventing a zero. If you used other methods,
+          keep that work in the second column so readers can see a second
+          identification path. Diagrflow implements the 2020 new-review templates
+          only. It does not draw the superseded PRISMA 2009 single-stream figure.
+        </p>
+        <h3>Export and cite the statement</h3>
+        <p>
+          Put the exported SVG or PNG in the manuscript. In the figure legend,
+          cite Page MJ, McKenzie JE, Bossuyt PM, et al. The PRISMA 2020 statement:
+          an updated guideline for reporting systematic reviews. BMJ.
+          2021;372:n71. doi:10.1136/bmj.n71. The official templates are published
+          at{" "}
+          <a href="https://www.prisma-statement.org/prisma-2020-flow-diagram">
+            prisma-statement.org/prisma-2020-flow-diagram
+          </a>{" "}
+          under CC BY 4.0. Diagrflow adapts that structure. It is not affiliated
+          with prisma-statement.org and does not speak for the PRISMA authors.
+        </p>
       </section>
 
       <section className="cases shell" id="cases">
@@ -46,7 +124,7 @@ export function HomePage() {
           <div>
             <h2>Worked figures</h2>
             <p className="fine">
-              Three topologies authors actually draw. Counts are illustrative — they
+              Four topologies authors actually draw. Counts are illustrative — they
               are not taken from a published review.
             </p>
           </div>
@@ -99,6 +177,36 @@ export function HomePage() {
             searching.
           </dd>
         </dl>
+      </section>
+
+      <section className="copy shell">
+        <h2>Counts you type into the editor</h2>
+        <p>
+          The editor is a worksheet, not a style picker. Each field maps to a box
+          or a line on the official figure. You do not drag arrows. You do not
+          choose a theme. You type the numbers you already collected while running
+          the search and the screen. If a count is unknown, stop and return to the
+          log; the figure should not paper over a missing tally.
+        </p>
+        <p>
+          Databases and registers are entered separately at identification. Optional
+          named database lines sit under that box when you want readers to see
+          PubMed, Embase, CENTRAL, or another source as its own n. Duplicates
+          removed, automation-ineligible records, and other removals belong in the
+          pre-screening block. Title and abstract exclusions belong in screening.
+          Full-text exclusions belong in eligibility, with a reason and a count for
+          each reason. Studies included and reports of included studies are typed
+          last, or derived when your inputs already determine them.
+        </p>
+        <p>
+          Worked figures on this page are labelled illustrative. They exist so you
+          can see a complete topology — databases only, databases plus registers,
+          a two-column other-methods figure, or grey-box automation lines — before
+          you replace the numbers with your own. They are not taken from a
+          published review and should not be copied into a manuscript as if they
+          were. Load one in the <Link to="/editor">editor</Link>, then overwrite
+          every count.
+        </p>
       </section>
 
       <section className="shell" id="examples">
@@ -194,7 +302,19 @@ export function HomePage() {
         </details>
         <details>
           <summary>Is there a paid plan?</summary>
-          <p>Not during this MVP. The editor and exports are free, with no account.</p>
+          <p>
+            Not during this MVP. The <Link to="/editor">editor</Link> and exports
+            are free, with no account. The <Link to="/pricing">pricing</Link> page
+            says so in plain language. There is no checkout on this site.
+          </p>
+        </details>
+        <details>
+          <summary>What should I put in the figure legend?</summary>
+          <p>
+            Name the review and cite Page et al., BMJ 2021;372:n71. If the figure
+            uses an illustrative worked example from this site, do not submit that
+            example as your review&apos;s flow diagram. Replace every count first.
+          </p>
         </details>
       </section>
 
@@ -206,7 +326,7 @@ export function HomePage() {
           <a href="https://www.prisma-statement.org/prisma-2020-flow-diagram">
             prisma-statement.org/prisma-2020-flow-diagram
           </a>
-          , CC BY 4.0.
+          , CC BY 4.0. Diagrflow is not affiliated with prisma-statement.org.
         </p>
       </section>
     </main>
