@@ -33,7 +33,7 @@ export function HomePage() {
           </p>
         </div>
         <aside className="hero-card" aria-hidden="true">
-          <svg viewBox="0 0 360 280" width="100%" height="auto" role="presentation">
+          <svg viewBox="0 0 360 280" width="100%" role="presentation">
             <rect x="24" y="18" width="130" height="52" fill="#fff" stroke="#171c18" />
             <rect x="206" y="18" width="130" height="52" fill="#fff" stroke="#171c18" />
             <rect x="24" y="100" width="130" height="44" fill="#fff" stroke="#171c18" />

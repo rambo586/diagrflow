@@ -84,6 +84,13 @@ describe("PRISMA 2020 layout data", () => {
     expect(screening.y + screening.height).toBeLessThanOrEqual(included.y);
   });
 
+  it("wraps footnotes and the citation so they stay on the canvas", () => {
+    expect(layout.footnotes.every((line) => line.length <= 110)).toBe(true);
+    expect(layout.citationLines.every((line) => line.length <= 110)).toBe(true);
+    expect(layout.citationLines.join(" ")).toContain("BMJ 2021");
+    expect(layout.citationLines.join(" ")).toContain("not affiliated");
+  });
+
   it("expands canvas width when the other-methods column is on", () => {
     const baseInput = emptyPrismaInput();
     const otherInput = emptyPrismaInput();

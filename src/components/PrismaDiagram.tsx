@@ -13,6 +13,9 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
   { layout },
   ref,
 ) {
+  const noteCount = layout.footnotes.length + layout.citationLines.length;
+  const noteStartY = layout.height - noteCount * 14 - 12;
+
   return (
     <svg
       ref={ref}
@@ -138,9 +141,9 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
 
       {layout.footnotes.map((note, index) => (
         <text
-          key={note}
+          key={`fn-${index}`}
           x={48}
-          y={layout.height - 58 + index * 16}
+          y={noteStartY + index * 14}
           fontFamily="Arial, Helvetica, sans-serif"
           fontSize="9"
           fill="#333"
@@ -148,15 +151,18 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
           {note}
         </text>
       ))}
-      <text
-        x={48}
-        y={layout.height - 18}
-        fontFamily="Arial, Helvetica, sans-serif"
-        fontSize="9"
-        fill="#333"
-      >
-        {layout.citation}
-      </text>
+      {layout.citationLines.map((line, index) => (
+        <text
+          key={`cite-${index}`}
+          x={48}
+          y={noteStartY + (layout.footnotes.length + index) * 14}
+          fontFamily="Arial, Helvetica, sans-serif"
+          fontSize="9"
+          fill="#333"
+        >
+          {line}
+        </text>
+      ))}
     </svg>
   );
 });

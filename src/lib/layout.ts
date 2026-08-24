@@ -42,7 +42,7 @@ export type DiagramLayout = {
   connectors: Connector[];
   phases: PhaseBand[];
   footnotes: string[];
-  citation: string;
+  citationLines: string[];
 };
 
 const BOX_W = 268;
@@ -56,6 +56,23 @@ const MIN_BOX_H = 56;
 
 function boxHeight(lineCount: number): number {
   return Math.max(MIN_BOX_H, PAD_Y * 2 + 18 + lineCount * LINE_H);
+}
+
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
 }
 
 function wrapBox(
@@ -85,10 +102,6 @@ function nLine(label: string, n: number): string {
 
 function midX(box: Rect): number {
   return box.x + box.width / 2;
-}
-
-function midY(box: Rect): number {
-  return box.y + box.height / 2;
 }
 
 function right(box: Rect): number {
@@ -311,13 +324,16 @@ export function layoutPrismaDiagram(
     );
   }
 
+  const sideY = (left: Rect, rightBox: Rect): number =>
+    Math.min(left.y + 28, rightBox.y + rightBox.height - 10);
+
   const connectors: Connector[] = [
     {
       id: "id-to-removed",
       x1: right(identified),
-      y1: midY(identified),
+      y1: sideY(identified, removed),
       x2: removed.x,
-      y2: midY(removed),
+      y2: sideY(identified, removed),
       kind: "right",
     },
     {
@@ -331,9 +347,9 @@ export function layoutPrismaDiagram(
     {
       id: "screened-to-excluded",
       x1: right(screened),
-      y1: midY(screened),
+      y1: sideY(screened, recordsExcluded),
       x2: recordsExcluded.x,
-      y2: midY(recordsExcluded),
+      y2: sideY(screened, recordsExcluded),
       kind: "right",
     },
     {
@@ -347,9 +363,9 @@ export function layoutPrismaDiagram(
     {
       id: "sought-to-not-retrieved",
       x1: right(sought),
-      y1: midY(sought),
+      y1: sideY(sought, notRetrieved),
       x2: notRetrieved.x,
-      y2: midY(notRetrieved),
+      y2: sideY(sought, notRetrieved),
       kind: "right",
     },
     {
@@ -363,9 +379,9 @@ export function layoutPrismaDiagram(
     {
       id: "assessed-to-excluded",
       x1: right(assessed),
-      y1: midY(assessed),
+      y1: sideY(assessed, reportsExcluded),
       x2: reportsExcluded.x,
-      y2: midY(reportsExcluded),
+      y2: sideY(assessed, reportsExcluded),
       kind: "right",
     },
     {
@@ -436,10 +452,14 @@ export function layoutPrismaDiagram(
     },
   ];
 
-  const footnotes = [OFFICIAL_LABELS.footnoteStar, OFFICIAL_LABELS.footnoteStarStar];
-  const footnoteBlock = 92;
+  const footnotes = [
+    ...wrapText(OFFICIAL_LABELS.footnoteStar, 108),
+    ...wrapText(OFFICIAL_LABELS.footnoteStarStar, 108),
+  ];
+  const citationLines = wrapText(OFFICIAL_LABELS.citation, 108);
+  const footnoteBlock = 28 + (footnotes.length + citationLines.length) * 14;
   const width = Math.max(760, maxRight + 48);
-  const height = maxBottom + footnoteBlock + 36;
+  const height = maxBottom + footnoteBlock + 24;
 
   return {
     width,
@@ -450,7 +470,7 @@ export function layoutPrismaDiagram(
     connectors,
     phases,
     footnotes,
-    citation: OFFICIAL_LABELS.citation,
+    citationLines,
   };
 }
 
