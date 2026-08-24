@@ -1,0 +1,11 @@
+# Diagrflow
+
+Diagrflow is a focused web tool for journal-ready PRISMA 2020 flow diagrams for systematic reviews. Type identification, screening, eligibility, and included counts; the diagram updates; export SVG or PNG with no watermark. Free MVP. Not affiliated with prisma-statement.org.
+
+Canonical site: https://diagrflow.com
+
+## Pages
+
+- https://diagrflow.com/
+- https://diagrflow.com/editor
+- https://diagrflow.com/pricing

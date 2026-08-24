@@ -4,3 +4,9 @@ dist-ssr
 *.local
 .DS_Store
 coverage
+.cf-token
+.env
+.env.*
+!.env.example
+.wrangler
+.dev.vars
