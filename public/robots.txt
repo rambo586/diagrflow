@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /og.html
 
 Sitemap: https://diagrflow.com/sitemap.xml

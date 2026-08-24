@@ -2,18 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PrismaDiagram } from "../components/PrismaDiagram";
 import { PrismaForm } from "../components/PrismaForm";
+import { caseFromSearch, DIAGRAM_CASES } from "../lib/cases";
 import { downloadPng, downloadSvg } from "../lib/exportDiagram";
 import { layoutPrismaDiagram } from "../lib/layout";
 import { balanceChecks, derivePrisma, emptyPrismaInput } from "../lib/prisma";
-import { SAMPLE_TITLE, samplePrismaInput } from "../lib/sample";
 
 export function EditorPage() {
-  const [params] = useSearchParams();
-  const startWithSample = params.get("sample") === "1";
-  const [input, setInput] = useState(() =>
-    startWithSample ? samplePrismaInput() : emptyPrismaInput(),
-  );
-  const [sampleNote, setSampleNote] = useState(startWithSample ? SAMPLE_TITLE : "");
+  const [params, setParams] = useSearchParams();
+  const initial = caseFromSearch(params);
+  const [input, setInput] = useState(() => initial?.input() ?? emptyPrismaInput());
+  const [activeCaseId, setActiveCaseId] = useState(initial?.id ?? "");
   const [exportError, setExportError] = useState("");
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -26,17 +24,22 @@ export function EditorPage() {
   const derived = useMemo(() => derivePrisma(input), [input]);
   const layout = useMemo(() => layoutPrismaDiagram(input, derived), [input, derived]);
   const balances = useMemo(() => balanceChecks(input, derived), [input, derived]);
+  const notice = DIAGRAM_CASES.find((item) => item.id === activeCaseId)?.notice;
 
-  const loadSample = () => {
-    setInput(samplePrismaInput());
-    setSampleNote(SAMPLE_TITLE);
+  const loadCase = (id: string) => {
+    const next = DIAGRAM_CASES.find((item) => item.id === id);
+    if (!next) return;
+    setInput(next.input());
+    setActiveCaseId(id);
     setExportError("");
+    setParams({ case: id }, { replace: true });
   };
 
   const reset = () => {
     setInput(emptyPrismaInput());
-    setSampleNote("");
+    setActiveCaseId("");
     setExportError("");
+    setParams({}, { replace: true });
   };
 
   const onExportSvg = () => {
@@ -59,14 +62,12 @@ export function EditorPage() {
     <main className="editor-page">
       <div className="diagram-toolbar">
         <div>
-          <p className="kicker">Editor</p>
-          <h1>PRISMA 2020 flow diagram</h1>
+          <h1>PRISMA 2020 editor</h1>
           <p className="export-note">
-            Working exports have no watermark. Authors may use the downloaded SVG or PNG
-            in journal submissions. Cite Page et al., BMJ 2021;372:n71. Diagrflow is not
-            affiliated with prisma-statement.org.
+            Working exports have no watermark. Authors may use the downloaded SVG or
+            PNG in journal submissions. Cite Page et al., BMJ 2021;372:n71.
           </p>
-          {sampleNote ? <p className="notice">{sampleNote}</p> : null}
+          {notice ? <p className="notice">{notice}</p> : null}
         </div>
         <div className="actions">
           <button type="button" className="btn btn-ghost" onClick={onExportSvg}>
@@ -83,8 +84,9 @@ export function EditorPage() {
           input={input}
           derived={derived}
           balances={balances}
+          activeCaseId={activeCaseId}
           onChange={setInput}
-          onLoadSample={loadSample}
+          onLoadCase={loadCase}
           onReset={reset}
         />
         <div className="diagram-wrap">

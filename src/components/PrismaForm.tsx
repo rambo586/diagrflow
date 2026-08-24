@@ -1,3 +1,4 @@
+import { DIAGRAM_CASES } from "../lib/cases";
 import type { DatabaseLine, ExclusionReason, PrismaDerived, PrismaInput } from "../lib/prisma";
 import { createId } from "../lib/prisma";
 import type { BalanceCheck } from "../lib/prisma";
@@ -6,8 +7,9 @@ type Props = {
   input: PrismaInput;
   derived: PrismaDerived;
   balances: BalanceCheck[];
+  activeCaseId: string;
   onChange: (next: PrismaInput) => void;
-  onLoadSample: () => void;
+  onLoadCase: (id: string) => void;
   onReset: () => void;
 };
 
@@ -115,8 +117,9 @@ export function PrismaForm({
   input,
   derived,
   balances,
+  activeCaseId,
   onChange,
-  onLoadSample,
+  onLoadCase,
   onReset,
 }: Props) {
   const patch = (partial: Partial<PrismaInput>) => onChange({ ...input, ...partial });
@@ -137,9 +140,16 @@ export function PrismaForm({
         Derived boxes follow official PRISMA 2020 arithmetic.
       </p>
       <div className="actions">
-        <button type="button" className="btn btn-primary" onClick={onLoadSample}>
-          Load sample diagram
-        </button>
+        {DIAGRAM_CASES.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={item.id === activeCaseId ? "btn btn-primary" : "btn btn-ghost"}
+            onClick={() => onLoadCase(item.id)}
+          >
+            {item.shortTitle}
+          </button>
+        ))}
         <button type="button" className="btn btn-ghost" onClick={onReset}>
           Reset
         </button>

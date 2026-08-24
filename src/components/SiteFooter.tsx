@@ -4,15 +4,17 @@ export function SiteFooter() {
   return (
     <footer className="site-footer shell">
       <div>
-        <strong>Diagrflow</strong> — journal-ready PRISMA 2020 flow diagrams.
-        Domain: diagrflow.com
+        Diagrflow draws PRISMA 2020 flow diagrams for systematic reviews. Not
+        affiliated with prisma-statement.org.
       </div>
       <div>
         <Link to="/editor">Editor</Link>
         {" · "}
         <Link to="/pricing">Pricing</Link>
         {" · "}
-        Not affiliated with prisma-statement.org
+        <a href="https://www.prisma-statement.org/prisma-2020-flow-diagram">
+          Official templates
+        </a>
       </div>
     </footer>
   );

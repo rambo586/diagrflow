@@ -3,6 +3,7 @@ import type { DiagramLayout } from "../lib/layout";
 
 type Props = {
   layout: DiagramLayout;
+  fit?: boolean;
 };
 
 function arrowHead(kind: "down" | "right"): string {
@@ -10,7 +11,7 @@ function arrowHead(kind: "down" | "right"): string {
 }
 
 export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDiagram(
-  { layout },
+  { layout, fit = false },
   ref,
 ) {
   const noteCount = layout.footnotes.length + layout.citationLines.length;
@@ -21,9 +22,10 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
       ref={ref}
       role="img"
       aria-label="PRISMA 2020 flow diagram"
-      width={layout.width}
-      height={layout.height}
+      width={fit ? "100%" : layout.width}
+      height={fit ? "100%" : layout.height}
       viewBox={`0 0 ${layout.width} ${layout.height}`}
+      preserveAspectRatio="xMidYMid meet"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>

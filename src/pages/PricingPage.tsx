@@ -9,40 +9,32 @@ export function PricingPage() {
   }, []);
 
   return (
-    <main className="shell section">
-      <p className="kicker">Pricing</p>
+    <main className="shell doc-page">
       <h1>Free while this is an MVP</h1>
       <p className="lede">
-        Diagrflow is a focused PRISMA 2020 maker. There is no paid plan and no payment
-        form on this site.
+        Diagrflow is a focused PRISMA 2020 maker. There is no paid plan and no
+        payment form on this site.
       </p>
-      <div className="grid-2">
-        <article className="card">
-          <p className="price">$0</p>
-          <h3>Public editor</h3>
-          <ul>
-            <li>Interactive PRISMA 2020 diagram</li>
-            <li>SVG and PNG export, no watermark</li>
-            <li>Authors may use exports in journal submissions</li>
-            <li>One built-in sample diagram</li>
-          </ul>
-          <Link className="btn btn-primary" to="/editor">
-            Open the editor
-          </Link>
-        </article>
-        <article className="card">
-          <h3>What this is not</h3>
-          <p>
-            There is no Stripe checkout, no usage metric on this page, and no customer
-            quotes. If a paid tier is added later, it will be described here in plain
-            language — not invented in advance.
-          </p>
-          <p className="fine">
-            Publication rights: exported figures belong to you to include in manuscripts
-            and supplements. Keep the PRISMA 2020 citation in the figure legend.
-          </p>
-        </article>
+      <p className="price">$0</p>
+      <ul>
+        <li>Interactive PRISMA 2020 diagram with official box labels</li>
+        <li>Three illustrative topologies you can load and edit</li>
+        <li>SVG and PNG export, no watermark</li>
+        <li>Authors may use exports in journal submissions</li>
+      </ul>
+      <div className="actions">
+        <Link className="btn btn-primary" to="/editor">
+          Open the editor
+        </Link>
+        <Link className="btn btn-ghost" to="/#cases">
+          Worked figures
+        </Link>
       </div>
+      <p className="fine">
+        There is no Stripe checkout and no customer quotes. If a paid tier is added
+        later, it will be described here in plain language. Keep the PRISMA 2020
+        citation in the figure legend.
+      </p>
     </main>
   );
 }

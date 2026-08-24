@@ -1,0 +1,13 @@
+{
+  "name": "Diagrflow",
+  "short_name": "Diagrflow",
+  "description": "Journal-ready PRISMA 2020 flow diagrams",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#171c18",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

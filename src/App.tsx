@@ -7,7 +7,7 @@ import { PricingPage } from "./pages/PricingPage";
 
 export default function App() {
   return (
-    <>
+    <div className="app-frame">
       <SiteHeader />
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -16,6 +16,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <SiteFooter />
-    </>
+    </div>
   );
 }

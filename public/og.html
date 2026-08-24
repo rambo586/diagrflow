@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex" />
+    <title>Diagrflow OG</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #f4f1ea;
+        font-family: Geist, ui-sans-serif, sans-serif;
+        color: #171c18;
+      }
+      .card {
+        width: 1200px;
+        height: 630px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 28px;
+        position: relative;
+      }
+      .lock {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      .mark {
+        width: 72px;
+        height: 72px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 72px;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+      }
+      p {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 400;
+        color: #4a524c;
+      }
+      .bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 12px;
+        background: #171c18;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="lock">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" fill="#171c18" />
+          <rect x="6" y="6" width="10" height="6" stroke="#f4efe6" stroke-width="1.4" fill="none" />
+          <rect x="6" y="16" width="10" height="6" stroke="#f4efe6" stroke-width="1.4" fill="none" />
+          <path d="M11 12v4" stroke="#f4efe6" stroke-width="1.4" />
+          <path d="M16 9h5v4" stroke="#f4efe6" stroke-width="1.4" fill="none" />
+          <rect x="19" y="13" width="7" height="5" stroke="#f4efe6" stroke-width="1.4" fill="none" />
+        </svg>
+        <h1>Diagrflow</h1>
+      </div>
+      <p>Journal-ready PRISMA 2020 flow diagrams</p>
+      <div class="bar"></div>
+    </div>
+  </body>
+</html>
