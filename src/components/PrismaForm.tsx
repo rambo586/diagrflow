@@ -11,6 +11,10 @@ type Props = {
   onReset: () => void;
 };
 
+function fieldName(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 function NumberField({
   label,
   value,
@@ -20,10 +24,13 @@ function NumberField({
   value: number;
   onChange: (n: number) => void;
 }) {
+  const name = fieldName(label);
   return (
-    <label className="field">
+    <label className="field" htmlFor={name}>
       {label}
       <input
+        id={name}
+        name={name}
         type="number"
         min={0}
         inputMode="numeric"
@@ -45,9 +52,11 @@ function ReasonList({
     <div>
       {rows.map((row, index) => (
         <div className="row-2" key={row.id}>
-          <label className="field">
+          <label className="field" htmlFor={`${row.id}-reason`}>
             Reason {index + 1}
             <input
+              id={`${row.id}-reason`}
+              name={`${row.id}-reason`}
               type="text"
               value={row.reason}
               onChange={(event) =>
@@ -59,9 +68,11 @@ function ReasonList({
               }
             />
           </label>
-          <label className="field">
+          <label className="field" htmlFor={`${row.id}-n`}>
             n
             <input
+              id={`${row.id}-n`}
+              name={`${row.id}-n`}
               type="number"
               min={0}
               value={row.n}
@@ -148,6 +159,8 @@ export function PrismaForm({
         />
         <label className="check">
           <input
+            id="show-database-lines"
+            name="show-database-lines"
             type="checkbox"
             checked={input.showDatabaseLines}
             onChange={(event) => patch({ showDatabaseLines: event.target.checked })}
@@ -157,17 +170,21 @@ export function PrismaForm({
         {input.showDatabaseLines
           ? input.databaseLines.map((line) => (
               <div className="row-2" key={line.id}>
-                <label className="field">
+                <label className="field" htmlFor={`${line.id}-name`}>
                   Database
                   <input
+                    id={`${line.id}-name`}
+                    name={`${line.id}-name`}
                     type="text"
                     value={line.name}
                     onChange={(event) => updateLine(line.id, { name: event.target.value })}
                   />
                 </label>
-                <label className="field">
+                <label className="field" htmlFor={`${line.id}-n`}>
                   n
                   <input
+                    id={`${line.id}-n`}
+                    name={`${line.id}-n`}
                     type="number"
                     min={0}
                     value={line.n}
@@ -200,6 +217,8 @@ export function PrismaForm({
         />
         <label className="check">
           <input
+            id="show-automation"
+            name="show-automation"
             type="checkbox"
             checked={input.showAutomation}
             onChange={(event) => patch({ showAutomation: event.target.checked })}
@@ -215,6 +234,8 @@ export function PrismaForm({
         ) : null}
         <label className="check">
           <input
+            id="show-other-removed"
+            name="show-other-removed"
             type="checkbox"
             checked={input.showOtherRemoved}
             onChange={(event) => patch({ showOtherRemoved: event.target.checked })}
@@ -240,6 +261,8 @@ export function PrismaForm({
         />
         <label className="check">
           <input
+            id="show-records-excluded-breakdown"
+            name="show-records-excluded-breakdown"
             type="checkbox"
             checked={input.showRecordsExcludedBreakdown}
             onChange={(event) =>
@@ -293,9 +316,11 @@ export function PrismaForm({
           Leave overrides blank to use the remaining report count. Studies and reports
           are different counts in PRISMA 2020.
         </p>
-        <label className="field">
+        <label className="field" htmlFor="studies-included-override">
           Studies included in review (optional override)
           <input
+            id="studies-included-override"
+            name="studies-included-override"
             type="number"
             min={0}
             placeholder={String(derived.studiesIncluded)}
@@ -308,9 +333,11 @@ export function PrismaForm({
             }
           />
         </label>
-        <label className="field">
+        <label className="field" htmlFor="reports-included-override">
           Reports of included studies (optional override)
           <input
+            id="reports-included-override"
+            name="reports-included-override"
             type="number"
             min={0}
             placeholder={String(derived.reportsOfIncludedStudies)}
@@ -329,6 +356,8 @@ export function PrismaForm({
         <h3>Other methods (optional)</h3>
         <label className="check">
           <input
+            id="include-other-methods"
+            name="include-other-methods"
             type="checkbox"
             checked={input.includeOtherMethods}
             onChange={(event) => patch({ includeOtherMethods: event.target.checked })}
@@ -353,7 +382,7 @@ export function PrismaForm({
               onChange={(otherCitationSearching) => patch({ otherCitationSearching })}
             />
             <NumberField
-              label="Reports not retrieved (n)"
+              label="Other methods: reports not retrieved (n)"
               value={input.otherReportsNotRetrieved}
               onChange={(otherReportsNotRetrieved) => patch({ otherReportsNotRetrieved })}
             />
