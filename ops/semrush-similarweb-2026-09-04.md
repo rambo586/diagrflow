@@ -13,5 +13,12 @@ Organic traffic/keywords unavailable; AS **0**. Referring domains 10 / backlinks
 - Keywords: **2** (diagrflow, diagrflow.com — brand only)
 - Status at setup: collecting
 
+
+## Similarweb (节点2 PRO 全球版, 到期 2026-09-25)
+- blackmyth.game formal project preserved: Jul 2026 Worldwide visits **5,426**
+- Favorites present: diagrflow.com, sortstreak.com, racedayengine.com, tryink.me
+- tryink.me Jul 2026 visits **723**; diagrflow/sortstreak/racedayengine favorites showed no readable visits
+- API quota tooltip seen: 855/10000
+
 ## Notes
 Shared Semrush keyword pool is panel-wide (~5000). PT projects on shared accounts can be deleted by other tenants — recheck before reading ranks.
