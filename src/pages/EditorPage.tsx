@@ -6,6 +6,7 @@ import { caseFromSearch, DIAGRAM_CASES } from "../lib/cases";
 import { downloadPng, downloadSvg } from "../lib/exportDiagram";
 import { layoutPrismaDiagram } from "../lib/layout";
 import { balanceChecks, derivePrisma, emptyPrismaInput } from "../lib/prisma";
+import { EDITOR_META } from "../seo";
 
 export function EditorPage() {
   const [params, setParams] = useSearchParams();
@@ -16,9 +17,9 @@ export function EditorPage() {
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
-    document.title = "PRISMA 2020 editor — Diagrflow";
+    document.title = EDITOR_META.title;
     const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute("href", "https://diagrflow.com/editor");
+    if (canonical) canonical.setAttribute("href", EDITOR_META.canonical);
   }, []);
 
   const derived = useMemo(() => derivePrisma(input), [input]);

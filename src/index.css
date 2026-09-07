@@ -347,6 +347,32 @@ button:focus-visible {
   color: var(--color-ink-2);
 }
 
+.copy {
+  max-width: var(--measure);
+  padding: var(--space-lg) 0 var(--space-2xl);
+}
+
+.copy p,
+.copy ul {
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
+.copy p + p,
+.copy p + h3,
+.copy h3 + p,
+.copy ul {
+  margin-top: var(--space-sm);
+}
+
+.copy h2 {
+  margin-bottom: var(--space-sm);
+}
+
+.copy h3 {
+  margin-top: var(--space-md);
+}
+
 .methods {
   padding-bottom: var(--space-2xl);
 }
