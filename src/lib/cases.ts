@@ -27,10 +27,10 @@ export const DIAGRAM_CASES: DiagramCase[] = [
       "Illustrative counts for a databases-and-registers figure — not from a published review.",
     input: () =>
       fromEmpty({
-        databases: 1842,
+        databases: 1851,
         registers: 48,
         databaseLines: [
-          { id: "db-pubmed", name: "PubMed", n: 812 },
+          { id: "db-pubmed", name: "PubMed", n: 821 },
           { id: "db-embase", name: "Embase", n: 701 },
           { id: "db-central", name: "CENTRAL", n: 329 },
         ],
@@ -100,10 +100,10 @@ export const DIAGRAM_CASES: DiagramCase[] = [
       "Illustrative counts showing optional grey boxes and the human/automation split — not from a published review.",
     input: () =>
       fromEmpty({
-        databases: 4100,
+        databases: 4112,
         registers: 90,
         databaseLines: [
-          { id: "db-pubmed", name: "PubMed", n: 1680 },
+          { id: "db-pubmed", name: "PubMed", n: 1692 },
           { id: "db-embase", name: "Embase", n: 1510 },
           { id: "db-cinahl", name: "CINAHL", n: 910 },
         ],

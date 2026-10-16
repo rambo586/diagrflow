@@ -2,10 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PrismaDiagram } from "../components/PrismaDiagram";
 import { PrismaForm } from "../components/PrismaForm";
+import {
+  trackManualEdit,
+  trackOpen,
+  trackSampleLoaded,
+  trackValidationError,
+} from "../lib/analytics";
 import { caseFromSearch, DIAGRAM_CASES } from "../lib/cases";
 import { downloadPng, downloadSvg } from "../lib/exportDiagram";
 import { layoutPrismaDiagram } from "../lib/layout";
-import { balanceChecks, derivePrisma, emptyPrismaInput } from "../lib/prisma";
+import {
+  balanceChecks,
+  derivePrisma,
+  emptyPrismaInput,
+  type PrismaInput,
+  validatePrisma,
+} from "../lib/prisma";
+import { EDITOR_META } from "../seo";
 
 export function EditorPage() {
   const [params, setParams] = useSearchParams();
@@ -16,15 +29,34 @@ export function EditorPage() {
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
-    document.title = "PRISMA 2020 editor — Diagrflow";
+    document.title = EDITOR_META.title;
     const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute("href", "https://diagrflow.com/editor");
+    if (canonical) canonical.setAttribute("href", EDITOR_META.canonical);
+    trackOpen("/editor");
+    if (initial) {
+      trackSampleLoaded(initial.id, "/editor");
+    }
   }, []);
 
   const derived = useMemo(() => derivePrisma(input), [input]);
   const layout = useMemo(() => layoutPrismaDiagram(input, derived), [input, derived]);
   const balances = useMemo(() => balanceChecks(input, derived), [input, derived]);
+  const validation = useMemo(() => validatePrisma(input, derived), [input, derived]);
   const notice = DIAGRAM_CASES.find((item) => item.id === activeCaseId)?.notice;
+
+  const handleInputChange = (next: PrismaInput) => {
+    setInput(next);
+    setExportError("");
+    trackManualEdit("/editor");
+    const nextValidation = validatePrisma(next);
+    if (!nextValidation.canExport) {
+      trackValidationError(
+        nextValidation.hardErrors.length,
+        nextValidation.confirmations.length,
+        "/editor",
+      );
+    }
+  };
 
   const loadCase = (id: string) => {
     const next = DIAGRAM_CASES.find((item) => item.id === id);
@@ -32,6 +64,7 @@ export function EditorPage() {
     setInput(next.input());
     setActiveCaseId(id);
     setExportError("");
+    trackSampleLoaded(id, "/editor");
     setParams({ case: id }, { replace: true });
   };
 
@@ -45,14 +78,18 @@ export function EditorPage() {
   const onExportSvg = () => {
     if (!svgRef.current) return;
     setExportError("");
-    downloadSvg(svgRef.current);
+    try {
+      downloadSvg(svgRef.current, "prisma-2020-flow-diagram.svg", validation);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "SVG export blocked");
+    }
   };
 
   const onExportPng = async () => {
     if (!svgRef.current) return;
     setExportError("");
     try {
-      await downloadPng(svgRef.current);
+      await downloadPng(svgRef.current, "prisma-2020-flow-diagram.png", 3, validation);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : "PNG export failed");
     }
@@ -70,22 +107,53 @@ export function EditorPage() {
           {notice ? <p className="notice">{notice}</p> : null}
         </div>
         <div className="actions">
-          <button type="button" className="btn btn-ghost" onClick={onExportSvg}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            aria-disabled={!validation.canExport}
+            onClick={onExportSvg}
+          >
             Download SVG
           </button>
-          <button type="button" className="btn btn-primary" onClick={onExportPng}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            aria-disabled={!validation.canExport}
+            onClick={onExportPng}
+          >
             Download PNG
           </button>
         </div>
       </div>
-      {exportError ? <p className="notice">{exportError}</p> : null}
+      {exportError ? (
+        <p className="notice error-banner" role="alert">
+          {exportError}
+        </p>
+      ) : null}
+      {!validation.canExport ? (
+        <div className="validation-summary" role="status" aria-live="polite">
+          {validation.hardErrors.length > 0 ? (
+            <p className="validation-summary-error">
+              <strong>Export blocked ({validation.hardErrors.length} error{validation.hardErrors.length === 1 ? "" : "s"}):</strong>{" "}
+              {validation.hardErrors[0].message}
+            </p>
+          ) : null}
+          {validation.confirmations.length > 0 ? (
+            <p className="validation-summary-confirm">
+              <strong>Confirmation required:</strong>{" "}
+              {validation.confirmations[0].message}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="editor-grid">
         <PrismaForm
           input={input}
           derived={derived}
           balances={balances}
+          validation={validation}
           activeCaseId={activeCaseId}
-          onChange={setInput}
+          onChange={handleInputChange}
           onLoadCase={loadCase}
           onReset={reset}
         />

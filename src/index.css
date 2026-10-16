@@ -82,6 +82,8 @@ h3 {
 
 .app-frame > main {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .site-header {
@@ -347,6 +349,32 @@ button:focus-visible {
   color: var(--color-ink-2);
 }
 
+.copy {
+  max-width: var(--measure);
+  padding: var(--space-lg) 0 var(--space-2xl);
+}
+
+.copy p,
+.copy ul {
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
+.copy p + p,
+.copy p + h3,
+.copy h3 + p,
+.copy ul {
+  margin-top: var(--space-sm);
+}
+
+.copy h2 {
+  margin-bottom: var(--space-sm);
+}
+
+.copy h3 {
+  margin-top: var(--space-md);
+}
+
 .methods {
   padding-bottom: var(--space-2xl);
 }
@@ -392,6 +420,11 @@ button:focus-visible {
   margin-bottom: var(--space-md);
 }
 
+.diagram-toolbar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .export-note {
   font-size: var(--text-sm);
   color: var(--color-ink-2);
@@ -412,10 +445,16 @@ button:focus-visible {
   align-items: start;
 }
 
+.editor-grid > * {
+  min-width: 0;
+}
+
 .panel {
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
   padding: var(--space-sm);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .panel h2 {
@@ -492,6 +531,63 @@ button:focus-visible {
 
 .balance.bad {
   color: var(--color-bad);
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--color-bad);
+}
+
+.field-messages {
+  margin-top: 2px;
+}
+
+.field-issue {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.field-issue.error {
+  color: var(--color-bad);
+}
+
+.field-issue.confirmation {
+  color: var(--color-ink-2);
+}
+
+.error-banner {
+  color: var(--color-bad);
+  font-weight: 500;
+  margin-bottom: var(--space-sm);
+}
+
+.validation-summary {
+  border: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.validation-summary p {
+  margin: 0;
+}
+
+.validation-summary p + p {
+  margin-top: 4px;
+}
+
+.validation-summary-error {
+  color: var(--color-bad);
+}
+
+.validation-summary-confirm {
+  color: var(--color-ink-2);
+}
+
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .diagram-wrap {
@@ -614,6 +710,10 @@ button:focus-visible {
     grid-template-columns: minmax(0, 1fr);
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .balance {
+    flex-wrap: wrap;
   }
 
   h1 {

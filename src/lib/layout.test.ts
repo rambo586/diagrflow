@@ -69,8 +69,8 @@ describe("PRISMA 2020 layout data", () => {
     const identified = boxById(layout, "recordsIdentified");
     const screened = boxById(layout, "recordsScreened");
     const included = boxById(layout, "studiesIncluded");
-    expect(identified.lines.some((line) => line.includes("1842"))).toBe(true);
-    expect(screened.lines.some((line) => line.includes("1278"))).toBe(true);
+    expect(identified.lines.some((line) => line.includes("1851"))).toBe(true);
+    expect(screened.lines.some((line) => line.includes("1287"))).toBe(true);
     expect(included.lines.some((line) => line.includes("52"))).toBe(true);
     expect(included.lines.some((line) => line.includes("61"))).toBe(true);
   });
