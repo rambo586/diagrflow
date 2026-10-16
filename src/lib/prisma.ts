@@ -32,6 +32,7 @@ export type PrismaInput = {
 
   studiesIncludedOverride: number | null;
   reportsOfIncludedOverride: number | null;
+  confirmStudiesEqualReports?: boolean;
 
   includeOtherMethods: boolean;
   otherWebsites: number;
@@ -61,11 +62,15 @@ export type PrismaDerived = {
 
 export type BalanceId =
   | "identification"
+  | "databaseLines"
   | "screening"
+  | "screeningBreakdown"
   | "retrieval"
   | "eligibility"
   | "otherRetrieval"
-  | "otherEligibility";
+  | "otherEligibility"
+  | "includedReports"
+  | "includedStudies";
 
 export type BalanceCheck = {
   id: BalanceId;
@@ -73,6 +78,23 @@ export type BalanceCheck = {
   ok: boolean;
   expected: number;
   actual: number;
+};
+
+export type ValidationSeverity = "error" | "confirmation";
+
+export type ValidationIssue = {
+  id: string;
+  field: string;
+  severity: ValidationSeverity;
+  message: string;
+};
+
+export type PrismaValidationResult = {
+  canExport: boolean;
+  hardErrors: ValidationIssue[];
+  confirmations: ValidationIssue[];
+  issues: ValidationIssue[];
+  fieldIssues: Record<string, ValidationIssue[]>;
 };
 
 export const OFFICIAL_LABELS = {
@@ -151,6 +173,7 @@ export function emptyPrismaInput(): PrismaInput {
     ],
     studiesIncludedOverride: null,
     reportsOfIncludedOverride: null,
+    confirmStudiesEqualReports: false,
     includeOtherMethods: false,
     otherWebsites: 0,
     otherOrganisations: 0,
@@ -163,17 +186,21 @@ export function emptyPrismaInput(): PrismaInput {
   };
 }
 
+export function isNonNegInt(n: number | null | undefined): n is number {
+  return typeof n === "number" && Number.isFinite(n) && Number.isInteger(n) && n >= 0;
+}
+
+export function nonNeg(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.trunc(n));
+}
+
 export function sumReasons(reasons: ExclusionReason[]): number {
   return reasons.reduce((sum, row) => sum + nonNeg(row.n), 0);
 }
 
 export function sumDatabaseLines(lines: DatabaseLine[]): number {
   return lines.reduce((sum, row) => sum + nonNeg(row.n), 0);
-}
-
-export function nonNeg(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.trunc(n));
 }
 
 export function derivePrisma(input: PrismaInput): PrismaDerived {
@@ -241,67 +268,573 @@ export function formatN(n: number): string {
   return `(n = ${n})`;
 }
 
+/**
+ * Validates raw PrismaInput BEFORE any clamping/truncation (`nonNeg`).
+ * Separates hard errors (`severity: "error"`) from confirmation checks (`severity: "confirmation"`).
+ * Both block export (`canExport === false`) until resolved by the user.
+ */
+export function validatePrisma(
+  input: PrismaInput,
+  derived: PrismaDerived = derivePrisma(input),
+): PrismaValidationResult {
+  const issues: ValidationIssue[] = [];
+
+  const pushIssue = (
+    id: string,
+    field: string,
+    severity: ValidationSeverity,
+    message: string,
+  ) => {
+    issues.push({ id, field, severity, message });
+  };
+
+  const checkRequiredCount = (value: number, field: string, label: string): boolean => {
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      pushIssue(`${field}-empty`, field, "error", `${label} is required (enter 0 if none).`);
+      return false;
+    }
+    if (!Number.isFinite(value)) {
+      pushIssue(`${field}-non-finite`, field, "error", `${label} must be a finite number.`);
+      return false;
+    }
+    if (value < 0) {
+      pushIssue(
+        `${field}-negative`,
+        field,
+        "error",
+        `${label} cannot be negative (entered ${value}).`,
+      );
+      return false;
+    }
+    if (!Number.isInteger(value)) {
+      pushIssue(
+        `${field}-decimal`,
+        field,
+        "error",
+        `${label} must be a whole number (entered ${value}).`,
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const checkOptionalCount = (
+    value: number | null,
+    field: string,
+    label: string,
+  ): boolean => {
+    if (value === null) return true;
+    return checkRequiredCount(value, field, label);
+  };
+
+  // 1. Raw field-level validation (before any clamping/rounding)
+  checkRequiredCount(input.databases, "databases", "Records from databases");
+  checkRequiredCount(input.registers, "registers", "Records from registers");
+  checkRequiredCount(
+    input.duplicatesRemoved,
+    "duplicatesRemoved",
+    "Duplicate records removed",
+  );
+
+  if (input.showAutomation) {
+    checkRequiredCount(
+      input.automationIneligible,
+      "automationIneligible",
+      "Records marked ineligible by automation tools",
+    );
+  }
+  if (input.showOtherRemoved) {
+    checkRequiredCount(
+      input.otherRemoved,
+      "otherRemoved",
+      "Records removed for other reasons",
+    );
+  }
+
+  checkRequiredCount(
+    input.recordsExcluded,
+    "recordsExcluded",
+    "Records excluded at title/abstract",
+  );
+  if (input.showRecordsExcludedBreakdown) {
+    checkRequiredCount(
+      input.recordsExcludedByHuman,
+      "recordsExcludedByHuman",
+      "Records excluded by a human",
+    );
+    checkRequiredCount(
+      input.recordsExcludedByAutomation,
+      "recordsExcludedByAutomation",
+      "Records excluded by automation tools",
+    );
+  }
+
+  checkRequiredCount(
+    input.reportsNotRetrieved,
+    "reportsNotRetrieved",
+    "Reports not retrieved",
+  );
+
+  if (input.showDatabaseLines) {
+    for (const line of input.databaseLines) {
+      checkRequiredCount(
+        line.n,
+        `databaseLine:${line.id}`,
+        `Database line "${line.name.trim() || "Database"}" count`,
+      );
+    }
+  }
+
+  for (const row of input.exclusionReasons) {
+    const ok = checkRequiredCount(
+      row.n,
+      `exclusionReason:${row.id}`,
+      `Full-text exclusion reason "${row.reason.trim() || "Reason"}" count`,
+    );
+    if (ok && row.n > 0 && !row.reason.trim()) {
+      pushIssue(
+        `exclusionReason:${row.id}-label`,
+        `exclusionReason:${row.id}`,
+        "error",
+        "Full-text exclusion reason with n > 0 must have a non-empty label.",
+      );
+    }
+  }
+
+  checkOptionalCount(
+    input.studiesIncludedOverride,
+    "studiesIncludedOverride",
+    "Studies included in review",
+  );
+  checkOptionalCount(
+    input.reportsOfIncludedOverride,
+    "reportsOfIncludedOverride",
+    "Reports of included studies",
+  );
+
+  if (input.includeOtherMethods) {
+    checkRequiredCount(input.otherWebsites, "otherWebsites", "Other methods: websites");
+    checkRequiredCount(
+      input.otherOrganisations,
+      "otherOrganisations",
+      "Other methods: organisations",
+    );
+    checkRequiredCount(
+      input.otherCitationSearching,
+      "otherCitationSearching",
+      "Other methods: citation searching",
+    );
+    checkOptionalCount(
+      input.otherReportsSoughtOverride,
+      "otherReportsSoughtOverride",
+      "Other methods: reports sought for retrieval",
+    );
+    checkRequiredCount(
+      input.otherReportsNotRetrieved,
+      "otherReportsNotRetrieved",
+      "Other methods: reports not retrieved",
+    );
+    for (const row of input.otherExclusionReasons) {
+      const ok = checkRequiredCount(
+        row.n,
+        `otherExclusionReason:${row.id}`,
+        `Other methods exclusion reason "${row.reason.trim() || "Reason"}" count`,
+      );
+      if (ok && row.n > 0 && !row.reason.trim()) {
+        pushIssue(
+          `otherExclusionReason:${row.id}-label`,
+          `otherExclusionReason:${row.id}`,
+          "error",
+          "Other methods exclusion reason with n > 0 must have a non-empty label.",
+        );
+      }
+    }
+  }
+
+  // 2. Enabled breakdown reconciliation
+  if (input.showDatabaseLines && isNonNegInt(input.databases)) {
+    const allLinesValid = input.databaseLines.every((line) => isNonNegInt(line.n));
+    if (allLinesValid) {
+      const lineSum = input.databaseLines.reduce((acc, line) => acc + line.n, 0);
+      if (lineSum !== input.databases) {
+        pushIssue(
+          "databaseLines-mismatch",
+          "databaseLines",
+          "error",
+          `Per-database line counts sum to ${lineSum}, which does not match Databases total (${input.databases}).`,
+        );
+      }
+    }
+  }
+
+  if (
+    input.showRecordsExcludedBreakdown &&
+    isNonNegInt(input.recordsExcluded) &&
+    isNonNegInt(input.recordsExcludedByHuman) &&
+    isNonNegInt(input.recordsExcludedByAutomation)
+  ) {
+    const breakdownSum =
+      input.recordsExcludedByHuman + input.recordsExcludedByAutomation;
+    if (breakdownSum !== input.recordsExcluded) {
+      pushIssue(
+        "recordsExcludedBreakdown-mismatch",
+        "recordsExcludedBreakdown",
+        "error",
+        `Human (${input.recordsExcludedByHuman}) + automation (${input.recordsExcludedByAutomation}) exclusions = ${breakdownSum}, which does not match Records excluded (${input.recordsExcluded}).`,
+      );
+    }
+  }
+
+  // 3. Stage-by-stage deduction bounds (preventing negative downstream counts)
+  if (derived.removedBeforeScreening > derived.identified) {
+    pushIssue(
+      "identification-exceeded",
+      "duplicatesRemoved",
+      "error",
+      `Records removed before screening (${derived.removedBeforeScreening}) exceeds records identified (${derived.identified}), leaving ${derived.recordsScreened} records screened.`,
+    );
+  }
+
+  if (
+    derived.recordsScreened >= 0 &&
+    isNonNegInt(input.recordsExcluded) &&
+    input.recordsExcluded > derived.recordsScreened
+  ) {
+    pushIssue(
+      "screening-exceeded",
+      "recordsExcluded",
+      "error",
+      `Records excluded (${input.recordsExcluded}) exceeds records screened (${derived.recordsScreened}), leaving ${derived.reportsSought} reports sought.`,
+    );
+  }
+
+  if (
+    derived.reportsSought >= 0 &&
+    isNonNegInt(input.reportsNotRetrieved) &&
+    input.reportsNotRetrieved > derived.reportsSought
+  ) {
+    pushIssue(
+      "retrieval-exceeded",
+      "reportsNotRetrieved",
+      "error",
+      `Reports not retrieved (${input.reportsNotRetrieved}) exceeds reports sought for retrieval (${derived.reportsSought}), leaving ${derived.reportsAssessed} reports assessed.`,
+    );
+  }
+
+  if (
+    derived.reportsAssessed >= 0 &&
+    derived.reportsExcluded > derived.reportsAssessed
+  ) {
+    pushIssue(
+      "eligibility-exceeded",
+      "exclusionReasons",
+      "error",
+      `Full-text reports excluded (${derived.reportsExcluded}) exceeds reports assessed for eligibility (${derived.reportsAssessed}), leaving ${derived.reportsIncludedFromDatabases} reports included.`,
+    );
+  }
+
+  if (input.includeOtherMethods) {
+    if (
+      input.otherReportsSoughtOverride !== null &&
+      isNonNegInt(input.otherReportsSoughtOverride) &&
+      input.otherReportsSoughtOverride > derived.otherIdentified
+    ) {
+      pushIssue(
+        "other-sought-exceeded",
+        "otherReportsSoughtOverride",
+        "error",
+        `Other methods reports sought (${input.otherReportsSoughtOverride}) exceeds records identified via other methods (${derived.otherIdentified}).`,
+      );
+    }
+
+    if (
+      derived.otherReportsSought >= 0 &&
+      isNonNegInt(input.otherReportsNotRetrieved) &&
+      input.otherReportsNotRetrieved > derived.otherReportsSought
+    ) {
+      pushIssue(
+        "other-retrieval-exceeded",
+        "otherReportsNotRetrieved",
+        "error",
+        `Other methods reports not retrieved (${input.otherReportsNotRetrieved}) exceeds reports sought (${derived.otherReportsSought}), leaving ${derived.otherReportsAssessed} reports assessed.`,
+      );
+    }
+
+    if (
+      derived.otherReportsAssessed >= 0 &&
+      derived.otherReportsExcluded > derived.otherReportsAssessed
+    ) {
+      pushIssue(
+        "other-eligibility-exceeded",
+        "otherExclusionReasons",
+        "error",
+        `Other methods full-text exclusions (${derived.otherReportsExcluded}) exceeds reports assessed (${derived.otherReportsAssessed}), leaving ${derived.otherReportsIncluded} reports included.`,
+      );
+    }
+  }
+
+  // 4. Final included reports & studies reconciliation
+  const flowRemainingReports =
+    derived.reportsIncludedFromDatabases + derived.otherReportsIncluded;
+
+  if (
+    input.reportsOfIncludedOverride !== null &&
+    isNonNegInt(input.reportsOfIncludedOverride) &&
+    flowRemainingReports >= 0 &&
+    input.reportsOfIncludedOverride !== flowRemainingReports
+  ) {
+    pushIssue(
+      "reportsOfIncluded-mismatch",
+      "reportsOfIncludedOverride",
+      "error",
+      `Reports of included studies (${input.reportsOfIncludedOverride}) does not reconcile with reports remaining after eligibility assessment (${flowRemainingReports}).`,
+    );
+  }
+
+  // Studies vs Reports semantic rule:
+  // If studiesIncludedOverride is left blank while there are included reports (> 0),
+  // require explicit confirmation or an explicit studies count.
+  if (
+    input.studiesIncludedOverride === null &&
+    derived.reportsOfIncludedStudies > 0 &&
+    input.confirmStudiesEqualReports !== true
+  ) {
+    pushIssue(
+      "studiesIncluded-unconfirmed",
+      "studiesIncludedOverride",
+      "confirmation",
+      `Enter the number of studies included in review, or confirm that studies equal reports (n = ${derived.reportsOfIncludedStudies}). In PRISMA 2020, one study may map to multiple reports.`,
+    );
+  }
+
+  if (
+    input.studiesIncludedOverride !== null &&
+    isNonNegInt(input.studiesIncludedOverride) &&
+    derived.reportsOfIncludedStudies >= 0 &&
+    input.studiesIncludedOverride > derived.reportsOfIncludedStudies
+  ) {
+    pushIssue(
+      "studiesIncluded-exceeds-reports",
+      "studiesIncludedOverride",
+      "error",
+      `Studies included in review (${input.studiesIncludedOverride}) cannot exceed reports of included studies (${derived.reportsOfIncludedStudies}) without accounting for the reports in the flow.`,
+    );
+  }
+
+  if (
+    input.studiesIncludedOverride === 0 &&
+    derived.reportsOfIncludedStudies > 0
+  ) {
+    pushIssue(
+      "studiesIncluded-zero-with-reports",
+      "studiesIncludedOverride",
+      "error",
+      `Studies included cannot be 0 when ${derived.reportsOfIncludedStudies} reports of included studies remain.`,
+    );
+  }
+
+  const hardErrors = issues.filter((item) => item.severity === "error");
+  const confirmations = issues.filter((item) => item.severity === "confirmation");
+  const fieldIssues: Record<string, ValidationIssue[]> = {};
+  for (const issue of issues) {
+    if (!fieldIssues[issue.field]) {
+      fieldIssues[issue.field] = [];
+    }
+    fieldIssues[issue.field].push(issue);
+  }
+
+  return {
+    canExport: issues.length === 0,
+    hardErrors,
+    confirmations,
+    issues,
+    fieldIssues,
+  };
+}
+
+/**
+ * Independent arithmetic and semantic balance checks for PRISMA 2020 stages.
+ * Never rubber-stamps negative downstream counts or mismatched overrides.
+ */
 export function balanceChecks(
   input: PrismaInput,
   derived: PrismaDerived,
 ): BalanceCheck[] {
+  const idValid =
+    isNonNegInt(input.databases) &&
+    isNonNegInt(input.registers) &&
+    isNonNegInt(input.duplicatesRemoved) &&
+    (!input.showAutomation || isNonNegInt(input.automationIneligible)) &&
+    (!input.showOtherRemoved || isNonNegInt(input.otherRemoved));
+
+  const screenValid = idValid && isNonNegInt(input.recordsExcluded);
+  const retrievalValid = screenValid && isNonNegInt(input.reportsNotRetrieved);
+  const eligibilityValid =
+    retrievalValid && input.exclusionReasons.every((row) => isNonNegInt(row.n));
+
   const checks: BalanceCheck[] = [
     {
       id: "identification",
-      label: "Identified − removed = records screened",
-      ok: derived.recordsScreened === derived.identified - derived.removedBeforeScreening,
-      expected: derived.identified - derived.removedBeforeScreening,
+      label: "Identified − removed = records screened (≥ 0)",
+      ok:
+        idValid &&
+        derived.recordsScreened >= 0 &&
+        derived.recordsScreened === derived.identified - derived.removedBeforeScreening,
+      expected: Math.max(0, derived.identified - derived.removedBeforeScreening),
       actual: derived.recordsScreened,
     },
-    {
-      id: "screening",
-      label: "Screened − excluded = reports sought",
-      ok: derived.reportsSought === derived.recordsScreened - nonNeg(input.recordsExcluded),
-      expected: derived.recordsScreened - nonNeg(input.recordsExcluded),
-      actual: derived.reportsSought,
-    },
+  ];
+
+  if (input.showDatabaseLines) {
+    const linesValid =
+      isNonNegInt(input.databases) &&
+      input.databaseLines.every((line) => isNonNegInt(line.n));
+    const lineSum = sumDatabaseLines(input.databaseLines);
+    checks.push({
+      id: "databaseLines",
+      label: "Per-database lines sum = databases total",
+      ok: linesValid && lineSum === input.databases,
+      expected: nonNeg(input.databases),
+      actual: lineSum,
+    });
+  }
+
+  checks.push({
+    id: "screening",
+    label: "Screened − excluded = reports sought (≥ 0)",
+    ok:
+      screenValid &&
+      derived.recordsScreened >= 0 &&
+      derived.reportsSought >= 0 &&
+      derived.reportsSought === derived.recordsScreened - input.recordsExcluded,
+    expected: Math.max(0, derived.recordsScreened - nonNeg(input.recordsExcluded)),
+    actual: derived.reportsSought,
+  });
+
+  if (input.showRecordsExcludedBreakdown) {
+    const breakdownValid =
+      isNonNegInt(input.recordsExcluded) &&
+      isNonNegInt(input.recordsExcludedByHuman) &&
+      isNonNegInt(input.recordsExcludedByAutomation);
+    const breakdownSum =
+      nonNeg(input.recordsExcludedByHuman) + nonNeg(input.recordsExcludedByAutomation);
+    checks.push({
+      id: "screeningBreakdown",
+      label: "Human + automation exclusions = records excluded",
+      ok: breakdownValid && breakdownSum === input.recordsExcluded,
+      expected: nonNeg(input.recordsExcluded),
+      actual: breakdownSum,
+    });
+  }
+
+  checks.push(
     {
       id: "retrieval",
-      label: "Sought − not retrieved = reports assessed",
+      label: "Sought − not retrieved = reports assessed (≥ 0)",
       ok:
-        derived.reportsAssessed ===
-        derived.reportsSought - nonNeg(input.reportsNotRetrieved),
-      expected: derived.reportsSought - nonNeg(input.reportsNotRetrieved),
+        retrievalValid &&
+        derived.reportsSought >= 0 &&
+        derived.reportsAssessed >= 0 &&
+        derived.reportsAssessed === derived.reportsSought - input.reportsNotRetrieved,
+      expected: Math.max(0, derived.reportsSought - nonNeg(input.reportsNotRetrieved)),
       actual: derived.reportsAssessed,
     },
     {
       id: "eligibility",
-      label: "Assessed − full-text exclusions = included reports (databases)",
+      label: "Assessed − full-text exclusions = included reports (≥ 0)",
       ok:
+        eligibilityValid &&
+        derived.reportsAssessed >= 0 &&
+        derived.reportsIncludedFromDatabases >= 0 &&
         derived.reportsIncludedFromDatabases ===
-        derived.reportsAssessed - derived.reportsExcluded,
-      expected: derived.reportsAssessed - derived.reportsExcluded,
+          derived.reportsAssessed - derived.reportsExcluded,
+      expected: Math.max(0, derived.reportsAssessed - derived.reportsExcluded),
       actual: derived.reportsIncludedFromDatabases,
     },
-  ];
+  );
 
   if (input.includeOtherMethods) {
+    const otherIdValid =
+      isNonNegInt(input.otherWebsites) &&
+      isNonNegInt(input.otherOrganisations) &&
+      isNonNegInt(input.otherCitationSearching) &&
+      (input.otherReportsSoughtOverride === null ||
+        (isNonNegInt(input.otherReportsSoughtOverride) &&
+          input.otherReportsSoughtOverride <= derived.otherIdentified));
+    const otherRetrievalValid =
+      otherIdValid && isNonNegInt(input.otherReportsNotRetrieved);
+    const otherEligibilityValid =
+      otherRetrievalValid &&
+      input.otherExclusionReasons.every((row) => isNonNegInt(row.n));
+
     checks.push(
       {
         id: "otherRetrieval",
-        label: "Other methods: sought − not retrieved = assessed",
+        label: "Other methods: sought − not retrieved = assessed (≥ 0)",
         ok:
+          otherRetrievalValid &&
+          derived.otherReportsSought >= 0 &&
+          derived.otherReportsAssessed >= 0 &&
           derived.otherReportsAssessed ===
+            derived.otherReportsSought - input.otherReportsNotRetrieved,
+        expected: Math.max(
+          0,
           derived.otherReportsSought - nonNeg(input.otherReportsNotRetrieved),
-        expected: derived.otherReportsSought - nonNeg(input.otherReportsNotRetrieved),
+        ),
         actual: derived.otherReportsAssessed,
       },
       {
         id: "otherEligibility",
-        label: "Other methods: assessed − exclusions = included reports",
+        label: "Other methods: assessed − exclusions = included reports (≥ 0)",
         ok:
+          otherEligibilityValid &&
+          derived.otherReportsAssessed >= 0 &&
+          derived.otherReportsIncluded >= 0 &&
           derived.otherReportsIncluded ===
+            derived.otherReportsAssessed - derived.otherReportsExcluded,
+        expected: Math.max(
+          0,
           derived.otherReportsAssessed - derived.otherReportsExcluded,
-        expected: derived.otherReportsAssessed - derived.otherReportsExcluded,
+        ),
         actual: derived.otherReportsIncluded,
       },
     );
   }
+
+  const flowRemainingReports =
+    derived.reportsIncludedFromDatabases + derived.otherReportsIncluded;
+  const reportsOverrideValid =
+    input.reportsOfIncludedOverride === null ||
+    isNonNegInt(input.reportsOfIncludedOverride);
+
+  checks.push({
+    id: "includedReports",
+    label: "Remaining flow reports = reports of included studies",
+    ok:
+      eligibilityValid &&
+      reportsOverrideValid &&
+      flowRemainingReports >= 0 &&
+      derived.reportsOfIncludedStudies === flowRemainingReports,
+    expected: Math.max(0, flowRemainingReports),
+    actual: derived.reportsOfIncludedStudies,
+  });
+
+  const studiesValid =
+    (input.studiesIncludedOverride === null
+      ? derived.reportsOfIncludedStudies === 0 ||
+        input.confirmStudiesEqualReports === true
+      : isNonNegInt(input.studiesIncludedOverride)) &&
+    derived.studiesIncluded >= 0 &&
+    derived.studiesIncluded <= derived.reportsOfIncludedStudies &&
+    (derived.reportsOfIncludedStudies === 0 || derived.studiesIncluded > 0);
+
+  checks.push({
+    id: "includedStudies",
+    label: "Studies included confirmed and ≤ reports of included studies",
+    ok: studiesValid,
+    expected: derived.reportsOfIncludedStudies,
+    actual: derived.studiesIncluded,
+  });
 
   return checks;
 }

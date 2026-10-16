@@ -20,6 +20,8 @@ describe("illustrative cases", () => {
       "citation-search",
       "automation-screen",
       "rct-db-only",
+      "long-reasons-multi-db",
+      "large-counts-full-two-col",
     ]);
     expect(DIAGRAM_CASES[1].input().includeOtherMethods).toBe(true);
     expect(DIAGRAM_CASES[2].input().showAutomation).toBe(true);

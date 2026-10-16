@@ -19,6 +19,7 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
 
   return (
     <svg
+      id="prisma-diagram-svg"
       ref={ref}
       role="img"
       aria-label="PRISMA 2020 flow diagram"
@@ -51,29 +52,52 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
         </marker>
       </defs>
       <rect width={layout.width} height={layout.height} fill="#ffffff" />
-      <text
-        x={layout.width / 2}
-        y={28}
-        textAnchor="middle"
-        fontFamily="Arial, Helvetica, sans-serif"
-        fontSize="14"
-        fontWeight="700"
-        fill="#111"
-      >
-        {layout.header}
-      </text>
-      {layout.otherHeader ? (
-        <text
-          x={layout.boxes.find((box) => box.id === "otherIdentified")?.x ?? 0}
-          y={28}
-          fontFamily="Arial, Helvetica, sans-serif"
-          fontSize="12"
-          fontWeight="700"
-          fill="#111"
-        >
-          {layout.otherHeader}
-        </text>
-      ) : null}
+      {(() => {
+        const idBox = layout.boxes.find((box) => box.id === "recordsIdentified");
+        const remBox = layout.boxes.find((box) => box.id === "recordsRemoved");
+        const otherIdBox = layout.boxes.find((box) => box.id === "otherIdentified");
+        const otherNotRetBox = layout.boxes.find(
+          (box) => box.id === "otherReportsNotRetrieved",
+        );
+        const dbHeaderX =
+          layout.otherHeader && idBox && remBox
+            ? (idBox.x + remBox.x + remBox.width) / 2
+            : layout.width / 2;
+        const otherHeaderX =
+          otherIdBox && otherNotRetBox
+            ? (otherIdBox.x + otherNotRetBox.x + otherNotRetBox.width) / 2
+            : otherIdBox
+              ? otherIdBox.x + otherIdBox.width / 2
+              : 0;
+        return (
+          <>
+            <text
+              x={dbHeaderX}
+              y={28}
+              textAnchor="middle"
+              fontFamily="Arial, Helvetica, sans-serif"
+              fontSize="14"
+              fontWeight="700"
+              fill="#111"
+            >
+              {layout.header}
+            </text>
+            {layout.otherHeader ? (
+              <text
+                x={otherHeaderX}
+                y={28}
+                textAnchor="middle"
+                fontFamily="Arial, Helvetica, sans-serif"
+                fontSize="14"
+                fontWeight="700"
+                fill="#111"
+              >
+                {layout.otherHeader}
+              </text>
+            ) : null}
+          </>
+        );
+      })()}
 
       {layout.phases.map((phase) => (
         <g key={phase.id}>

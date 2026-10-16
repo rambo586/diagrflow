@@ -75,6 +75,10 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines;
 }
 
+function maxCharsForBoxWidth(width: number): number {
+  return Math.max(18, Math.floor((width - 20) / 6.3));
+}
+
 function wrapBox(
   id: string,
   x: number,
@@ -84,14 +88,21 @@ function wrapBox(
   role: Rect["role"],
   width = BOX_W,
 ): Rect {
+  const maxChars = maxCharsForBoxWidth(width);
+  const wrappedLines = lines.flatMap((line) => {
+    const indentMatch = line.match(/^(\s+)/);
+    const indent = indentMatch ? indentMatch[1] : "";
+    const parts = wrapText(line.trim(), maxChars - indent.length);
+    return parts.map((part, idx) => (idx === 0 ? `${indent}${part}` : `${indent}  ${part}`));
+  });
   return {
     id,
     x,
     y,
     width,
-    height: boxHeight(lines.length),
+    height: boxHeight(wrappedLines.length),
     title,
-    lines,
+    lines: wrappedLines,
     role,
   };
 }

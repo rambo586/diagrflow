@@ -27,10 +27,10 @@ export const DIAGRAM_CASES: DiagramCase[] = [
       "Illustrative counts for a databases-and-registers figure — not from a published review.",
     input: () =>
       fromEmpty({
-        databases: 1842,
+        databases: 1851,
         registers: 48,
         databaseLines: [
-          { id: "db-pubmed", name: "PubMed", n: 812 },
+          { id: "db-pubmed", name: "PubMed", n: 821 },
           { id: "db-embase", name: "Embase", n: 701 },
           { id: "db-central", name: "CENTRAL", n: 329 },
         ],
@@ -100,10 +100,10 @@ export const DIAGRAM_CASES: DiagramCase[] = [
       "Illustrative counts showing optional grey boxes and the human/automation split — not from a published review.",
     input: () =>
       fromEmpty({
-        databases: 4100,
+        databases: 4112,
         registers: 90,
         databaseLines: [
-          { id: "db-pubmed", name: "PubMed", n: 1680 },
+          { id: "db-pubmed", name: "PubMed", n: 1692 },
           { id: "db-embase", name: "Embase", n: 1510 },
           { id: "db-cinahl", name: "CINAHL", n: 910 },
         ],
@@ -158,6 +158,115 @@ export const DIAGRAM_CASES: DiagramCase[] = [
         ],
         studiesIncludedOverride: 56,
         reportsOfIncludedOverride: 56,
+      }),
+  },
+  {
+    id: "long-reasons-multi-db",
+    title: "Multi-database search with detailed exclusion criteria",
+    shortTitle: "Long reasons & multi-DB",
+    setting:
+      "Large systematic review searching 6 databases with detailed exclusion criteria to test text-wrapping and stage boundaries.",
+    topology: "6 database lines · multiple long exclusion reasons · text-wrapping stress test",
+    notice:
+      "Illustrative counts testing multi-line exclusion reasons and 6 bibliographic databases.",
+    input: () =>
+      fromEmpty({
+        databases: 3420,
+        registers: 180,
+        databaseLines: [
+          { id: "db-medline", name: "MEDLINE (Ovid)", n: 1120 },
+          { id: "db-embase", name: "Embase (Elsevier)", n: 980 },
+          { id: "db-central", name: "Cochrane CENTRAL", n: 540 },
+          { id: "db-wos", name: "Web of Science Core Collection", n: 410 },
+          { id: "db-psycinfo", name: "PsycINFO (EBSCO)", n: 220 },
+          { id: "db-cinahl", name: "CINAHL Plus", n: 150 },
+        ],
+        showDatabaseLines: true,
+        duplicatesRemoved: 1100,
+        recordsExcluded: 2150,
+        recordsExcludedByHuman: 2150,
+        reportsNotRetrieved: 18,
+        exclusionReasons: [
+          {
+            id: "ex-1",
+            reason:
+              "Non-randomised observational cohort or case-control design",
+            n: 120,
+          },
+          {
+            id: "ex-2",
+            reason:
+              "Paediatric or adolescent population (< 18 years at baseline)",
+            n: 85,
+          },
+          {
+            id: "ex-3",
+            reason: "Co-intervention without isolated exercise arm",
+            n: 42,
+          },
+          {
+            id: "ex-4",
+            reason:
+              "Follow-up duration shorter than 12 weeks post-randomisation",
+            n: 31,
+          },
+          {
+            id: "ex-5",
+            reason:
+              "Conference abstract or trial protocol without full results",
+            n: 19,
+          },
+        ],
+        studiesIncludedOverride: 30,
+        reportsOfIncludedOverride: 35,
+      }),
+  },
+  {
+    id: "large-counts-full-two-col",
+    title: "Large-scale systematic review with all PRISMA 2020 sources",
+    shortTitle: "Large counts two-column",
+    setting:
+      "Comprehensive global evidence synthesis with over 100,000 records, grey literature, and automation tools.",
+    topology:
+      "Two-column figure · 100k+ counts · websites · organisations · automation split",
+    notice:
+      "Illustrative counts testing two-column layout with 6-digit counts, automation tools, and grey literature.",
+    input: () =>
+      fromEmpty({
+        databases: 124500,
+        registers: 8340,
+        databaseLines: [
+          { id: "db-medline", name: "PubMed / MEDLINE", n: 52400 },
+          { id: "db-embase", name: "Embase", n: 41100 },
+          { id: "db-scopus", name: "Scopus", n: 31000 },
+        ],
+        showDatabaseLines: true,
+        duplicatesRemoved: 38200,
+        automationIneligible: 24600,
+        otherRemoved: 1240,
+        showAutomation: true,
+        showOtherRemoved: true,
+        recordsExcluded: 67800,
+        recordsExcludedByHuman: 19800,
+        recordsExcludedByAutomation: 48000,
+        showRecordsExcludedBreakdown: true,
+        reportsNotRetrieved: 62,
+        exclusionReasons: [
+          { id: "ex-1", reason: "Wrong population", n: 380 },
+          { id: "ex-2", reason: "Wrong intervention", n: 245 },
+          { id: "ex-3", reason: "Wrong study design", n: 190 },
+        ],
+        studiesIncludedOverride: 164,
+        reportsOfIncludedOverride: 208,
+        includeOtherMethods: true,
+        otherWebsites: 420,
+        otherOrganisations: 180,
+        otherCitationSearching: 950,
+        otherReportsNotRetrieved: 35,
+        otherExclusionReasons: [
+          { id: "ox-1", reason: "Wrong population", n: 820 },
+          { id: "ox-2", reason: "Duplicate of database report", n: 610 },
+        ],
       }),
   },
 ];
