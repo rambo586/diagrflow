@@ -4,15 +4,25 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 
-const PORT = 4173;
-const DIST_DIR = path.resolve("dist");
-const EXPORTS_DIR = path.resolve("docs/exports");
-const ARTIFACTS_EXPORTS_DIR = path.resolve(
-  "/Users/mac/.gemini/antigravity-cli/brain/e0930027-8595-45f4-be13-658bd368956e/exports"
-);
+const PORT = Number(process.env.PORT || 4173);
+const DIST_DIR = path.resolve(process.env.DIST_DIR || "dist");
+const EXPORTS_DIR = path.resolve(process.env.EXPORTS_DIR || "docs/exports");
+const ARTIFACTS_EXPORTS_DIR = process.env.ARTIFACTS_EXPORTS_DIR
+  ? path.resolve(process.env.ARTIFACTS_EXPORTS_DIR)
+  : fs.existsSync("/Users/mac/.gemini/antigravity-cli/brain/e0930027-8595-45f4-be13-658bd368956e/exports")
+  ? path.resolve("/Users/mac/.gemini/antigravity-cli/brain/e0930027-8595-45f4-be13-658bd368956e/exports")
+  : null;
+
+const CHROME_PATH =
+  process.env.CHROME_BIN ||
+  (process.platform === "darwin"
+    ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    : "google-chrome");
 
 fs.mkdirSync(EXPORTS_DIR, { recursive: true });
-fs.mkdirSync(ARTIFACTS_EXPORTS_DIR, { recursive: true });
+if (ARTIFACTS_EXPORTS_DIR) {
+  fs.mkdirSync(ARTIFACTS_EXPORTS_DIR, { recursive: true });
+}
 
 // Read CSP directly from public/_headers line 7
 const headersContent = fs.readFileSync("public/_headers", "utf8");
@@ -61,8 +71,7 @@ const CASES = [
 server.listen(PORT, async () => {
   console.log(`Server running at http://127.0.0.1:${PORT}`);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chrome-diagrflow-"));
-  const chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  const chromeProc = spawn(chromePath, [
+  const chromeProc = spawn(CHROME_PATH, [
     "--headless=new",
     "--remote-debugging-port=9222",
     "--remote-allow-origins=*",
@@ -76,6 +85,9 @@ server.listen(PORT, async () => {
 
   try {
     const versionRes = await fetch("http://127.0.0.1:9222/json/version");
+    if (!versionRes.ok) {
+      throw new Error(`Failed to query Chrome version: ${versionRes.statusText}`);
+    }
     const versionData = await versionRes.json();
     console.log("Connected to Chrome:", versionData.Browser);
 
@@ -94,7 +106,7 @@ server.listen(PORT, async () => {
       if (callbacks.has(msg.id)) {
         const { resolve, reject } = callbacks.get(msg.id);
         callbacks.delete(msg.id);
-        if (msg.error) reject(msg.error);
+        if (msg.error) reject(new Error(msg.error.message || JSON.stringify(msg.error)));
         else resolve(msg.result);
       }
     };
@@ -118,6 +130,9 @@ server.listen(PORT, async () => {
         const text = data.params.args.map((a) => a.value || a.description).join(" ");
         if (data.params.type === "error") {
           console.error("Browser Console Error:", text);
+          if (text.includes("Content Security Policy") || text.includes("CSP")) {
+            process.exitCode = 1;
+          }
         }
       }
     });
@@ -136,7 +151,7 @@ server.listen(PORT, async () => {
           (async () => {
             const expected = ${JSON.stringify(item.expectedText)};
             const start = Date.now();
-            while (Date.now() - start < 5000) {
+            while (Date.now() - start < 6000) {
               const svg = document.querySelector("#prisma-diagram-svg");
               if (svg && svg.textContent.includes(expected)) return true;
               await new Promise(r => setTimeout(r, 100));
@@ -197,7 +212,7 @@ server.listen(PORT, async () => {
               };
               image.onerror = (e) => {
                 URL.revokeObjectURL(blobUrl);
-                reject(new Error("Could not rasterise the SVG: " + e));
+                reject(new Error("Could not rasterise the SVG (CSP blob: violation or image error)"));
               };
               image.src = blobUrl;
             });
@@ -208,22 +223,35 @@ server.listen(PORT, async () => {
       });
 
       if (!exportResult.result || !exportResult.result.value) {
-        throw new Error(`Export evaluation failed: ${JSON.stringify(exportResult)}`);
+        throw new Error(`Export evaluation failed for case ${item.id}: ${JSON.stringify(exportResult)}`);
       }
 
       const { svgMarkup, pngDataUrl, width, height, layoutW, layoutH } = exportResult.result.value;
 
+      // Assert dimensions strictly match expected scale = 3
+      const expectedScaleW = Math.round(item.expectedW * 3);
+      const expectedScaleH = Math.round(item.expectedH * 3);
+      if (width !== expectedScaleW || height !== expectedScaleH) {
+        throw new Error(
+          `Dimension mismatch for ${item.prefix}: got ${width}x${height}, expected ${expectedScaleW}x${expectedScaleH}`
+        );
+      }
+
       // Write SVG
       const svgPath = path.join(EXPORTS_DIR, `${item.prefix}.svg`);
       fs.writeFileSync(svgPath, svgMarkup, "utf8");
-      fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, `${item.prefix}.svg`), svgMarkup, "utf8");
+      if (ARTIFACTS_EXPORTS_DIR) {
+        fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, `${item.prefix}.svg`), svgMarkup, "utf8");
+      }
 
       // Write PNG from data URL
       const base64Data = pngDataUrl.replace(/^data:image\/png;base64,/, "");
       const pngBuffer = Buffer.from(base64Data, "base64");
       const pngPath = path.join(EXPORTS_DIR, `${item.prefix}.png`);
       fs.writeFileSync(pngPath, pngBuffer);
-      fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, `${item.prefix}.png`), pngBuffer);
+      if (ARTIFACTS_EXPORTS_DIR) {
+        fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, `${item.prefix}.png`), pngBuffer);
+      }
 
       console.log(
         `✓ ${item.prefix}: SVG written (${svgMarkup.length} B), PNG written (${pngBuffer.length} B) - Dimensions: ${width}x${height} (Scale 3 from layout ${layoutW}x${layoutH})`
@@ -243,7 +271,9 @@ server.listen(PORT, async () => {
     const desktopScreenshot = await send("Page.captureScreenshot", { format: "png" });
     const desktopBuffer = Buffer.from(desktopScreenshot.data, "base64");
     fs.writeFileSync(path.join(EXPORTS_DIR, "viewport-desktop-editor.png"), desktopBuffer);
-    fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, "viewport-desktop-editor.png"), desktopBuffer);
+    if (ARTIFACTS_EXPORTS_DIR) {
+      fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, "viewport-desktop-editor.png"), desktopBuffer);
+    }
     console.log("✓ Desktop viewport captured");
 
     // Capture mobile viewport (500x960)
@@ -259,7 +289,9 @@ server.listen(PORT, async () => {
     const mobileScreenshot = await send("Page.captureScreenshot", { format: "png" });
     const mobileBuffer = Buffer.from(mobileScreenshot.data, "base64");
     fs.writeFileSync(path.join(EXPORTS_DIR, "viewport-mobile-editor.png"), mobileBuffer);
-    fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, "viewport-mobile-editor.png"), mobileBuffer);
+    if (ARTIFACTS_EXPORTS_DIR) {
+      fs.writeFileSync(path.join(ARTIFACTS_EXPORTS_DIR, "viewport-mobile-editor.png"), mobileBuffer);
+    }
     console.log("✓ Mobile viewport captured");
 
     // Verify Anti-pattern in real browser: Input 10 databases, 20 duplicates -> click download
@@ -307,6 +339,82 @@ server.listen(PORT, async () => {
     });
     console.log("Anti-Pattern Verification Result in UI:", antiPatternResult.result.value);
 
+    // Strict assertion on anti-pattern blocking
+    const anti = antiPatternResult.result.value;
+    if (!anti.isAriaDisabled) {
+      throw new Error(`Anti-pattern failed: Download button is not aria-disabled`);
+    }
+    if (!anti.summary && !anti.notice) {
+      throw new Error(`Anti-pattern failed: expected error summary or error banner, got neither`);
+    }
+    console.log("✓ Anti-pattern assertion passed (Download blocked & error displayed)");
+
+    // Verify UI Reset functionality: Load case -> edit -> click Reset -> verify cleared
+    console.log("\nVerifying Reset functionality in Browser UI (load case -> edit -> Reset)...");
+    await send("Page.navigate", { url: `http://127.0.0.1:${PORT}/editor?case=large-counts-full-two-col` });
+    await new Promise((r) => setTimeout(r, 1200));
+
+    const resetCheck = await send("Runtime.evaluate", {
+      expression: `
+        (async () => {
+          function setVal(input, val) {
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+            setter.call(input, val);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+
+          const inputs = Array.from(document.querySelectorAll("input[type='number']"));
+          const dbInput = inputs[0];
+          const initialVal = dbInput?.value;
+
+          // Edit input
+          setVal(dbInput, "999");
+          const editedVal = dbInput?.value;
+
+          // Click Reset
+          const buttons = Array.from(document.querySelectorAll("button"));
+          const resetBtn = buttons.find(b => b.textContent?.trim() === "Reset");
+          if (!resetBtn) throw new Error("Reset button not found");
+          resetBtn.click();
+
+          // Wait for state & router update
+          await new Promise(r => setTimeout(r, 400));
+
+          const finalDbVal = dbInput?.value;
+          const urlAfterReset = window.location.href;
+          const hasCase = new URL(urlAfterReset).searchParams.has("case");
+          const noticeText = document.querySelector(".notice")?.textContent || "";
+
+          return { initialVal, editedVal, finalDbVal, urlAfterReset, hasCase, noticeText };
+        })()
+      `,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    console.log("Reset Verification Result:", resetCheck.result.value);
+
+    const resetVal = resetCheck.result.value;
+    if (resetVal.initialVal !== "124500") {
+      throw new Error(`Reset verification failed: Expected initial databases=124500, got ${resetVal.initialVal}`);
+    }
+    if (resetVal.editedVal !== "999") {
+      throw new Error(`Reset verification failed: Expected edited databases=999, got ${resetVal.editedVal}`);
+    }
+    if (resetVal.hasCase) {
+      throw new Error(`Reset verification failed: URL still contains case param: ${resetVal.urlAfterReset}`);
+    }
+    if (resetVal.finalDbVal === "124500" || resetVal.finalDbVal === "999") {
+      throw new Error(`Reset verification failed: databases not cleared! Still ${resetVal.finalDbVal}`);
+    }
+    if (resetVal.finalDbVal !== "0" && resetVal.finalDbVal !== "") {
+      throw new Error(`Reset verification failed: expected databases to be 0 or empty, got ${resetVal.finalDbVal}`);
+    }
+    if (resetVal.noticeText) {
+      throw new Error(`Reset verification failed: case notice was not cleared, got: ${resetVal.noticeText}`);
+    }
+    console.log("✓ Reset verification passed (URL param removed, data cleared, no reversion)");
+
     ws.close();
   } catch (err) {
     console.error("Execution failed:", err);
@@ -320,8 +428,13 @@ server.listen(PORT, async () => {
       } catch {
         // ignore locked files
       }
-      console.log("\nAll Done!");
-      process.exit(0);
+      const exitCode = process.exitCode || 0;
+      if (exitCode === 0) {
+        console.log("\nAll Done!");
+      } else {
+        console.error(`\nArtifacts generation finished with error exitCode: ${exitCode}`);
+      }
+      process.exit(exitCode);
     }, 500);
   }
 });

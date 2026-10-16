@@ -40,8 +40,16 @@ export function EditorPage() {
 
   const searchCase = caseFromSearch(params);
   const searchCaseId = searchCase?.id ?? "";
+  const isResettingRef = useRef(false);
 
   useEffect(() => {
+    if (isResettingRef.current) {
+      if (!searchCaseId) {
+        isResettingRef.current = false;
+      }
+      return;
+    }
+
     if (searchCaseId && searchCaseId !== activeCaseId) {
       const next = DIAGRAM_CASES.find((item) => item.id === searchCaseId);
       if (next) {
@@ -50,6 +58,10 @@ export function EditorPage() {
         setExportError("");
         trackSampleLoaded(searchCaseId, "/editor");
       }
+    } else if (!searchCaseId && activeCaseId) {
+      setInput(emptyPrismaInput());
+      setActiveCaseId("");
+      setExportError("");
     }
   }, [searchCaseId, activeCaseId]);
 
@@ -76,6 +88,7 @@ export function EditorPage() {
   const loadCase = (id: string) => {
     const next = DIAGRAM_CASES.find((item) => item.id === id);
     if (!next) return;
+    isResettingRef.current = false;
     setInput(next.input());
     setActiveCaseId(id);
     setExportError("");
@@ -84,6 +97,7 @@ export function EditorPage() {
   };
 
   const reset = () => {
+    isResettingRef.current = true;
     setInput(emptyPrismaInput());
     setActiveCaseId("");
     setExportError("");

@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > **执行基线**：`0e5162f455aa86b4eefbf44c8084ba29230aae13`（`origin/main`）。
-> **当前测试与构建状态**：全套 **6 个测试文件 / 51 项测试全部通过**（`npm test`），TypeScript 编译与三路由静态预渲染构建通过（`npm run build`）。已添加 GitHub Actions 自动化 CI 工作流（`.github/workflows/ci.yml`），由 CI 独立执行测试与构建。生产环境保持冻结，等待审核通过后再行决策。
+> **当前测试与构建状态**：全套 **7 个测试文件 / 53 项测试全部通过**（`npm test`），TypeScript 编译与三路由静态预渲染构建通过（`npm run build`）。已添加 GitHub Actions 自动化 CI 工作流（`.github/workflows/ci.yml`），由 CI 独立执行测试与构建。生产环境保持冻结，等待审核通过后再行决策。
 
 ---
 
@@ -15,6 +15,8 @@
 | **P1** | **纯样例被误算为有效导出**：先人工编辑，再加载全新未修改样例直接导出，原逻辑看会话曾编辑过，误判为有效会话。 | 在 [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts) 中引入 [`isCurrentFigurePureSample`](file:///Users/mac/diagrflow/src/lib/analytics.ts#L341-L347)，判定当前图是否为加载后未经修改的纯样例；纯样例导出记录 `isPureSample: true`，在会话漏斗中排除其 `generatedExport` 资格。 | 单元测试模拟“先编辑 -> 加载新样例 -> 立即导出”，确认 `qualifiesAsValidExportSession === false`；随后对该样例进行编辑再导出，立即正确恢复为 `true`（✅ 修复）。 |
 | **P2** | **导出门禁仍可跳过**：省略校验参数即可导出；研究数留空且省略确认参数时仍放行。 | 1. 在 [`src/lib/exportDiagram.ts`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts) 中将校验结果作为强约束，省略或为空时抛出 [`ExportBlockedError("MISSING_INPUT")`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts#L38-L44)。<br>2. 在 [`src/lib/prisma.ts`](file:///Users/mac/diagrflow/src/lib/prisma.ts#L600) 中将确认判断由 `=== false` 改为强要求 `!== true`，balanceChecks 严格要求 `=== true`。 | [`src/lib/exportDiagram.test.ts`](file:///Users/mac/diagrflow/src/lib/exportDiagram.test.ts) 与 [`src/lib/prisma.test.ts`](file:///Users/mac/diagrflow/src/lib/prisma.test.ts) 新增 7 个回归用例，验证省略参数一律拒绝导出（✅ 修复）。 |
 | **P2** | **统计平台异常阻断正常导出**：若 `window.gtag` 或 `window.plausible` 抛错，中断正常导出。 | 在 [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts#L202-L218) 中使用 `try/catch` 严格隔离第三方统计派发异常，统计故障不影响主业务。 | 模拟 `gtag` 抛错，验证导出与下载链路照常顺利完成（✅ 修复）。 |
+| **P2** | **第二轮审阅：Reset 未清空案例数据（路由状态竞争回退）**：预览页加载案例后点击 Reset，URL 移除 `case` 但数字仍残留旧案例数据。原因是 `useSearchParams` 异步推入导致内部 `activeCaseId` 清空瞬间旧 `searchCaseId` 仍存在，触发重复载入。 | 在 [`src/pages/EditorPage.tsx`](file:///Users/mac/diagrflow/src/pages/EditorPage.tsx#L43-L52) 引入 `isResettingRef` 守卫，在重置发起时屏蔽过渡渲染中的旧路由参数同步；在 [`src/pages/EditorPage.test.tsx`](file:///Users/mac/diagrflow/src/pages/EditorPage.test.tsx) 补充“加载案例→编辑→点击 Reset→微任务结算”全链路回归测试。 | 单元回归测试与真实浏览器端交互测试均验证：点击 Reset 后表单数字完全归零、提示横幅消除、URL 无参数，且微任务队列完成后数据绝不发生回弹（✅ 修复）。 |
+| **P2** | **第二轮审阅：验收脚本退出码被强行覆盖与断言缺失**：脚本捕获异常后将退出码置 1，但 `finally` 块硬编码 `process.exit(0)` 导致 CI/CD 无法感知真实失败；反例未加断言；路径写死本机绝对路径。 | 1. 在 [`scripts/generate-artifacts.mjs`](file:///Users/mac/diagrflow/scripts/generate-artifacts.mjs#L428-L437) 中移除 `exit(0)`，保留真实 `process.exitCode`。<br>2. 增加对反例（导出按钮被禁用、错误横幅存在）以及真实浏览器 Reset（数值清空、URL 参数消除）的严格断言。<br>3. 将路径抽离为可配置环境变量。 | 真实运行脚本顺利完成并退出码为 0，当断言或导出异常时精准以非零退出码终止（✅ 修复）。 |
 
 ---
 
