@@ -275,6 +275,24 @@ describe("DG-02 independent validation and counterexamples (10 independent scena
     expect(confirmedValidation.canExport).toBe(true);
   });
 
+  it("Scenario 7b (Studies vs Reports confirmation omitted): omitting confirmStudiesEqualReports (undefined) strictly blocks export", () => {
+    const input = emptyPrismaInput();
+    input.databases = 50;
+    input.duplicatesRemoved = 10;
+    input.recordsExcluded = 20;
+    input.reportsNotRetrieved = 2;
+    input.exclusionReasons = [{ id: "ex-1", reason: "Wrong population", n: 8 }];
+    delete input.confirmStudiesEqualReports;
+
+    const derived = derivePrisma(input);
+    const validation = validatePrisma(input, derived);
+    const checks = balanceChecks(input, derived);
+
+    expect(validation.canExport).toBe(false);
+    expect(validation.confirmations.some((c) => c.id === "studiesIncluded-unconfirmed")).toBe(true);
+    expect(checks.find((c) => c.id === "includedStudies")?.ok).toBe(false);
+  });
+
   it("Scenario 8 (Unreconciled manual reports override '52 remaining vs 61 override'): blocks export when reportsOfIncludedOverride != flow remaining", () => {
     const input = DIAGRAM_CASES[0].input();
     // Simulate the old buggy state where databases was 1842 (flow remaining = 52) but reportsOfIncludedOverride = 61

@@ -1,26 +1,26 @@
-# Diagrflow W1–W2 技术可靠性阶段交付与验收报告（DG-01 ～ DG-07）
+# Diagrflow W1–W2 技术可靠性阶段交付与验收报告（DG-01 ～ DG-07，含 PR #4 审阅修复）
 
 > [!NOTE]
-> **执行基线**：`0e5162f455aa86b4eefbf44c8084ba29230aae13`（已从 `origin/main` 快进合并）。
-> **当前测试与构建状态**：全套 **5 个测试文件 / 41 项测试全部通过**（`npm test`），TypeScript 编译与三路由静态预渲染构建通过（`npm run build`）。生产环境尚未触发部署，等待你审阅本报告与导出产物后授权发布。
+> **执行基线**：`0e5162f455aa86b4eefbf44c8084ba29230aae13`（`origin/main`）。
+> **当前测试与构建状态**：全套 **6 个测试文件 / 51 项测试全部通过**（`npm test`），TypeScript 编译与三路由静态预渲染构建通过（`npm run build`）。已添加 GitHub Actions 自动化 CI 工作流（`.github/workflows/ci.yml`），由 CI 独立执行测试与构建。生产环境保持冻结，等待审核通过后再行决策。
 
 ---
 
-## 一、五项审核调整落地对照表
+## 一、PR #4 审阅反馈与问题修复对照表
 
-| 调整项 | 实施细节与代码落点 |
-|---|---|
-| **1. 校验发生在数值修正之前** | 在 [`validatePrisma`](file:///Users/mac/diagrflow/src/lib/prisma.ts#L262-L545) 中，所有数值字段在进入 [`nonNeg`](file:///Users/mac/diagrflow/src/lib/prisma.ts#L186-L189) 截零/取整前直接对原始输入进行检查。[`PrismaForm`](file:///Users/mac/diagrflow/src/components/PrismaForm.tsx#L28-L35) 保留原始输入（清空必填项记为 `NaN` 显示为空，与显式输入的 `0` 严格区分；负数、小数原样保留在输入框中供用户修改并定位报错）。 |
-| **2. 研究数不能自动视为报告数** | 当 `reportsOfIncludedStudies > 0` 且 `studiesIncludedOverride === null` 时，若未勾选 `confirmStudiesEqualReports`（[`PrismaForm.tsx`](file:///Users/mac/diagrflow/src/components/PrismaForm.tsx#L406-L418) 中的显式确认框），产生 `studiesIncluded-unconfirmed` 待确认项并阻止导出。同时修正了 [`cases.ts`](file:///Users/mac/diagrflow/src/lib/cases.ts) 中案例 1（`t2d-exercise`：PubMed 调为 `821`、Databases `1851`，流程剩余 `61` 份报告与 `reportsOfIncludedOverride: 61` 对齐，保留 `52` 项研究 vs `61` 份报告的一对多语义）和案例 3（`automation-screen`：PubMed 调为 `1692`、Databases `4112`，流程剩余 `118` 份报告与覆盖值 `118` 对齐，保留 `91` 项研究 vs `118` 份报告）。 |
-| **3. 硬错误与待确认提示分开** | [`ValidationIssue`](file:///Users/mac/diagrflow/src/lib/prisma.ts#L84-L89) 区分 `severity: "error"`（负数、小数、必填清空、超额扣减、已启用细分合计不符、手动覆盖报告数与筛选流程剩余报告数不符、研究数大于报告数）与 `severity: "confirmation"`（研究数留空且未勾选确认等于报告数）。两者均阻止导出，绝不自动篡改数字来凑平。 |
-| **4. 导出拦截覆盖实际调用路径** | [`assertValidForExport`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts#L31-L48) 直接内置于 [`downloadSvg`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts#L50-L68) 与 [`downloadPng`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts#L70-L128) 内部，并与 [`EditorPage`](file:///Users/mac/diagrflow/src/pages/EditorPage.tsx#L78-L96) 共享同一份 `validation` 结果。专项验证了“有效 → 改成无效 → 尝试导出被拒 → 修正后恢复导出”（见 [`prisma.test.ts`](file:///Users/mac/diagrflow/src/lib/prisma.test.ts#L288-L303) Scenario 10）。 |
-| **5. 给预算留出余量** | 已在 [`.rankup/plan.md`](file:///Users/mac/diagrflow/.rankup/plan.md) 中将 W3 两篇教程（DG-08，2h）标记为条件/机动任务，保持总预算 18.25 小时不变。 |
+| 优先级 | 审阅发现与复现结果 | 修复方案与代码落点 | 回归验证结果 |
+|---|---|---|---|
+| **P1** | **PNG 实际下载失败（CSP 缺少 `blob:`）**：点击 Download PNG 报 `Could not rasterise the SVG`。响应 CSP 未允许图片使用 `blob:`，阻断了 `URL.createObjectURL(blob)`。 | 在 [`public/_headers`](file:///Users/mac/diagrflow/public/_headers#L7) 的 `Content-Security-Policy` 中将 `img-src` 更新为 `'self' data: blob:;`。 | 在 Headless Chrome 生产 CSP 环境下实测，6 份 PNG 全部成功栅格化并下载，控制台零 CSP 报错（✅ 修复）。 |
+| **P1** | **失败事件携带用户输入**：反例“10 减 20”报错文本直接传入 `trackExportFailed` 作为 `reason`，导致 `20、10、-10` 等用户输入数字上传至统计平台。 | 在 [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts) 中定义固定枚举 [`ExportErrorCode`](file:///Users/mac/diagrflow/src/lib/analytics.ts#L10-L24)（`VALIDATION_FAILED` / `MISSING_INPUT` / `CANVAS_CONTEXT_FAILED` / `RASTERIZE_FAILED` / `BLOB_FAILED` / `UNKNOWN_EXPORT_ERROR`），严禁上传动态报错文案；并提供 `sanitizeExportErrorCode` 兜底过滤。 | 自动化测试验证上传 props 的 `reason` 严格为固定枚举，且 props 中绝不包含任何输入数字或用户文案（✅ 修复）。 |
+| **P1** | **纯样例被误算为有效导出**：先人工编辑，再加载全新未修改样例直接导出，原逻辑看会话曾编辑过，误判为有效会话。 | 在 [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts) 中引入 [`isCurrentFigurePureSample`](file:///Users/mac/diagrflow/src/lib/analytics.ts#L341-L347)，判定当前图是否为加载后未经修改的纯样例；纯样例导出记录 `isPureSample: true`，在会话漏斗中排除其 `generatedExport` 资格。 | 单元测试模拟“先编辑 -> 加载新样例 -> 立即导出”，确认 `qualifiesAsValidExportSession === false`；随后对该样例进行编辑再导出，立即正确恢复为 `true`（✅ 修复）。 |
+| **P2** | **导出门禁仍可跳过**：省略校验参数即可导出；研究数留空且省略确认参数时仍放行。 | 1. 在 [`src/lib/exportDiagram.ts`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts) 中将校验结果作为强约束，省略或为空时抛出 [`ExportBlockedError("MISSING_INPUT")`](file:///Users/mac/diagrflow/src/lib/exportDiagram.ts#L38-L44)。<br>2. 在 [`src/lib/prisma.ts`](file:///Users/mac/diagrflow/src/lib/prisma.ts#L600) 中将确认判断由 `=== false` 改为强要求 `!== true`，balanceChecks 严格要求 `=== true`。 | [`src/lib/exportDiagram.test.ts`](file:///Users/mac/diagrflow/src/lib/exportDiagram.test.ts) 与 [`src/lib/prisma.test.ts`](file:///Users/mac/diagrflow/src/lib/prisma.test.ts) 新增 7 个回归用例，验证省略参数一律拒绝导出（✅ 修复）。 |
+| **P2** | **统计平台异常阻断正常导出**：若 `window.gtag` 或 `window.plausible` 抛错，中断正常导出。 | 在 [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts#L202-L218) 中使用 `try/catch` 严格隔离第三方统计派发异常，统计故障不影响主业务。 | 模拟 `gtag` 抛错，验证导出与下载链路照常顺利完成（✅ 修复）。 |
 
 ---
 
-## 二、DG-02 独立校验规则与 10 组独立测试场景
+## 二、DG-02 独立校验规则与 11 组独立测试场景
 
-完整测试实现见 [`prisma.test.ts`](file:///Users/mac/diagrflow/src/lib/prisma.test.ts#L148-L304)：
+完整测试实现见 [`prisma.test.ts`](file:///Users/mac/diagrflow/src/lib/prisma.test.ts#L148-L322)：
 
 | 场景编号 | 输入特征 | 预期行为与验收结果 |
 |---|---|---|
@@ -31,6 +31,7 @@
 | **Scenario 5** | **已启用数据库细分合计不符**（`databases=100`，子行 `40 + 50 = 90`） | 报 `databaseLines-mismatch` 硬错误，`databaseLines` 平衡检查为 `false`（✅ 通过） |
 | **Scenario 6** | **已启用初筛人工/自动化细分合计不符**（`recordsExcluded=50`，细分 `30 + 10 = 40`） | 报 `recordsExcludedBreakdown-mismatch` 硬错误并阻止导出（✅ 通过） |
 | **Scenario 7** | **Studies 留空未确认**（剩余报告 10，`studiesIncludedOverride=null`，未勾选确认） | 产生 `studiesIncluded-unconfirmed`（`severity: "confirmation"`）阻止导出；勾选 `confirmStudiesEqualReports: true` 后立即可导出（✅ 通过） |
+| **Scenario 7b** | **确认标志完全省略（`undefined`）**（省略 `confirmStudiesEqualReports` 字段） | 严格判定未确认，产生 `studiesIncluded-unconfirmed` 阻止导出（✅ 新增回归用例，通过） |
 | **Scenario 8** | **流程剩余报告数与手动覆盖报告数不符**（复现原“流程剩 52、手动填 61”） | 报 `reportsOfIncluded-mismatch` 硬错误，`includedReports` 检查为 `false`，阻止导出（✅ 通过） |
 | **Scenario 9** | **Other methods 分支超额排除**（评估 3 份，排除理由填 6 份） | `otherReportsIncluded = -3`，报 `other-eligibility-exceeded` 硬错误并阻止导出（✅ 通过） |
 | **Scenario 10** | **状态转换：有效 → 改无效 → 尝试导出 → 修正恢复** | 改为无效后立即拦截，修正回有效值后立即恢复导出（✅ 通过） |
@@ -39,9 +40,18 @@
 
 ## 三、DG-05 真实生成 12 份文件（6 组有效输入 × SVG/PNG）与视觉排障
 
-在真实验收生成的 SVG/PNG 文件时，我们发现并修复了 **2 个真实图形渲染缺陷**：
-1. **双栏模式顶部标题重叠**：原 [`PrismaDiagram.tsx`](file:///Users/mac/diagrflow/src/components/PrismaDiagram.tsx) 将左栏标题置于 `layout.width / 2`，开启右侧 `other-methods` 栏后与右栏标题重叠。现已改为分别在左栏双框中心与右栏双框中心对齐，彻底消除重叠。
-2. **长文本溢出矩形框右边界**：原 [`layout.ts`](file:///Users/mac/diagrflow/src/lib/layout.ts) 的 `wrapBox` 未对框内单行文本换行，导致灰框说明（`Records marked as ineligible by automation tools (n = 420)`）及长排除理由超出右边框。现已按框宽自动折行并动态增加框高，下游连接线与阶段色带自动下移，无任何重叠或裁切。
+针对审阅意见中“原 6 张 PNG 均为 1600×1400 视口截图、不能作为真实 PNG 下载通过证据”的问题，我们编写了完整的浏览器端真实栅格化运行脚本（[`scripts/generate-artifacts.mjs`](file:///Users/mac/diagrflow/scripts/generate-artifacts.mjs)），在本地启动加载正式 `_headers` CSP 的 HTTP 服务，通过 Headless Chrome 完整运行客户端导出与 Canvas 2D 栅格化流水线，将 6 组有效拓扑在 `scale = 3` 的规格下真实生成至 [`docs/exports/`](file:///Users/mac/diagrflow/docs/exports/)。
+
+### 真实 PNG 像素尺寸核对（通过 macOS `sips` 物理核验）
+
+| 案例文件 | 拓扑特征 | 矢量原始尺寸 | 3 倍放大下载预期尺寸 | 实际生成 PNG 物理尺寸 | 校验结论 |
+|---|---|---|---|---|---|
+| **01-t2d-exercise.png** | 标准数据库与注册库识别 | 760 × 754 | 2280 × 2262 | **2280 × 2262** | ✅ 尺寸完全吻合，字体无锯齿 |
+| **02-citation-search.png** | 官方双栏模式（含引文检索与网站） | 1292 × 738 | 3876 × 2214 | **3876 × 2214** | ✅ 双栏顶部居中，对齐无重叠 |
+| **03-automation-screen.png** | 灰框自动化不合格 + 初筛双细分 | 760 × 786 | 2280 × 2358 | **2280 × 2358** | ✅ 灰框文本自动折行，下游色带下移 |
+| **04-rct-db-only.png** | 纯数据库单来源，省略注册库 | 760 × 738 | 2280 × 2214 | **2280 × 2214** | ✅ 紧凑布局无空框 |
+| **05-long-reasons-multi-db.png** | 6 个数据库细分 + 5 组长理由多行折行 | 760 × 914 | 2280 × 2742 | **2280 × 2742** | ✅ 多行文本框宽自适应，无文字溢出 |
+| **06-large-counts-full-two-col.png** | 10 万级大计数 + 全来源完整双栏 | 1292 × 770 | 3876 × 2310 | **3876 × 2310** | ✅ 6 位数居中对齐，箭头路径平滑 |
 
 ### 6 组有效导出 PNG 视觉巡检（点击或滑动查看）
 
@@ -69,14 +79,20 @@
 
 ---
 
-## 四、DG-03 预渲染复用、DG-04/06 事件闭环与回滚预案
+## 四、DG-03 预渲染复用、DG-04/06 事件闭环与 CI 验证
 
 1. **三路由预渲染（DG-03）**：
    - 复用了 PR #3 的 [`scripts/prerender.mjs`](file:///Users/mac/diagrflow/scripts/prerender.mjs)、[`src/entry-server.tsx`](file:///Users/mac/diagrflow/src/entry-server.tsx)、[`src/prerenderHtml.ts`](file:///Users/mac/diagrflow/src/prerenderHtml.ts)、[`src/seo.ts`](file:///Users/mac/diagrflow/src/seo.ts) 与 [`public/_redirects`](file:///Users/mac/diagrflow/public/_redirects)。
-   - `npm run build` 生成 `dist/index.html`、`dist/pricing/index.html`、`dist/editor/index.html`，每个路由原始 HTML 均含独立 `<h1>`、正文段落、`<title>` 与 `canonical`，且 `?case=` 参数与客户端编辑导出均正常工作。
+   - `npm run build` 生成 `dist/index.html`、`dist/pricing/index.html`、`dist/editor/index.html`，每个路由原始 HTML 均含独立 `<h1>`、正文段落、`<title>` 与 `canonical`。
+   - 修复了客户端路由与 `?case=` 查询参数同步机制，在无需整页刷新的情况下可实时切换案例并触发图表重排。
+
 2. **最小产品漏斗与 5 次内部闭环（DG-04 & DG-06）**：
-   - [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts) 实现了 `open / edit / sample / error / attempt / generated / failed` 七类事件，按 `sessionId` 去重，自动识别 `?internal=1` 内部标记与未修改纯样例（`isPureSample`），**零用户输入内容上传**，且严格将触发下载命名为 `generated`（绝不称为已保存或已投稿）。
-   - 在 [`src/lib/analytics.test.ts`](file:///Users/mac/diagrflow/src/lib/analytics.test.ts) 中完成了 5 次内部端到端事件串联闭环测试，验证 `qualifiesAsValidExportSession === false`（100% 从业务统计中排除）。
-3. **发布候选与回滚点（DG-06）**：
-   - **当前回滚基线 Commit SHA**：`0e5162f455aa86b4eefbf44c8084ba29230aae13`（线上 Cloudflare Pages 当前生产部署）。
-   - **回滚命令**：若发布后发现任何异常，可立即在 Cloudflare Pages 回滚至上一部署，或本地 `git checkout 0e5162f && npm run deploy`。
+   - [`src/lib/analytics.ts`](file:///Users/mac/diagrflow/src/lib/analytics.ts) 实现了 `open / edit / sample / error / attempt / generated / failed` 七类事件，按 `sessionId` 去重。
+   - **闭环性质说明**：除在 [`src/lib/analytics.test.ts`](file:///Users/mac/diagrflow/src/lib/analytics.test.ts) 中对 5 组业务场景执行了状态机闭环测试（验证内部标记 `qualifiesAsValidExportSession === false`）外，本次通过 [`scripts/generate-artifacts.mjs`](file:///Users/mac/diagrflow/scripts/generate-artifacts.mjs) 在真实浏览器中执行了反例填报、点击导出、错误横幅渲染与 CSP 校验的全流程交互验证。
+
+3. **GitHub Actions 独立 CI 工作流**：
+   - 建立了 [`.github/workflows/ci.yml`](file:///Users/mac/diagrflow/.github/workflows/ci.yml)，对每个 push 和 PR 触发洁净环境（Node 22, `npm ci`, `npm test`, `npm run build`）的独立运行检查，脱离单纯依赖 Cloudflare 构建的局限。
+
+4. **发布候选与回滚点（DG-06）**：
+   - **当前生产基线 Commit SHA**：`0e5162f455aa86b4eefbf44c8084ba29230aae13`。
+   - **回滚命令**：若发布后发现任何异常，可直接在 Cloudflare Pages 面板一键回退到上一个 Deployment，或执行 `git checkout 0e5162f && npm run deploy`。

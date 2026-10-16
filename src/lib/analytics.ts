@@ -7,6 +7,32 @@ export type FunnelEventType =
   | "generated"
   | "failed";
 
+export type ExportErrorCode =
+  | "VALIDATION_FAILED"
+  | "MISSING_INPUT"
+  | "CANVAS_CONTEXT_FAILED"
+  | "RASTERIZE_FAILED"
+  | "BLOB_FAILED"
+  | "UNKNOWN_EXPORT_ERROR";
+
+export const ALLOWED_EXPORT_ERROR_CODES = new Set<string>([
+  "VALIDATION_FAILED",
+  "MISSING_INPUT",
+  "CANVAS_CONTEXT_FAILED",
+  "RASTERIZE_FAILED",
+  "BLOB_FAILED",
+  "UNKNOWN_EXPORT_ERROR",
+]);
+
+export function sanitizeExportErrorCode(
+  code?: string,
+): ExportErrorCode | undefined {
+  if (!code) return undefined;
+  return ALLOWED_EXPORT_ERROR_CODES.has(code)
+    ? (code as ExportErrorCode)
+    : "UNKNOWN_EXPORT_ERROR";
+}
+
 export type FunnelEventRecord = {
   id: string;
   sessionId: string;
@@ -20,7 +46,7 @@ export type FunnelEventRecord = {
   caseId?: string;
   errorCount?: number;
   confirmationCount?: number;
-  reason?: string;
+  reason?: ExportErrorCode;
 };
 
 export type SessionFunnelSummary = {
@@ -171,14 +197,22 @@ function appendFunnelEvent(record: FunnelEventRecord): void {
       case_id: record.caseId,
       error_count: record.errorCount,
       confirmation_count: record.confirmationCount,
-      reason: record.reason,
+      reason: sanitizeExportErrorCode(record.reason),
     };
 
     if (typeof win.gtag === "function") {
-      win.gtag("event", `diagrflow_${record.type}`, safeProps);
+      try {
+        win.gtag("event", `diagrflow_${record.type}`, safeProps);
+      } catch (err) {
+        console.warn("Analytics gtag dispatch failed:", err);
+      }
     }
     if (typeof win.plausible === "function") {
-      win.plausible(`diagrflow_${record.type}`, { props: safeProps });
+      try {
+        win.plausible(`diagrflow_${record.type}`, { props: safeProps });
+      } catch (err) {
+        console.warn("Analytics plausible dispatch failed:", err);
+      }
     }
   }
 }
@@ -304,6 +338,13 @@ export function trackValidationError(
   });
 }
 
+export function isCurrentFigurePureSample(state = getSessionState()): boolean {
+  if (state.loadedSample) {
+    return !state.editedSinceSample;
+  }
+  return !state.hasManualEdit;
+}
+
 export function trackExportAttempt(
   format: "svg" | "png",
   route = currentRoute(),
@@ -317,7 +358,7 @@ export function trackExportAttempt(
     route,
     isInternal: state.isInternal,
     hasManualEdit: state.hasManualEdit,
-    isPureSample: !state.hasManualEdit,
+    isPureSample: isCurrentFigurePureSample(state),
     format,
     caseId: state.activeCaseId || undefined,
   });
@@ -340,7 +381,7 @@ export function trackExportGenerated(
     route,
     isInternal: state.isInternal,
     hasManualEdit: state.hasManualEdit,
-    isPureSample: !state.hasManualEdit,
+    isPureSample: isCurrentFigurePureSample(state),
     format,
     caseId: state.activeCaseId || undefined,
   });
@@ -348,7 +389,7 @@ export function trackExportGenerated(
 
 export function trackExportFailed(
   format: "svg" | "png",
-  reason: string,
+  reason: ExportErrorCode,
   route = currentRoute(),
 ): void {
   const state = getSessionState();
@@ -360,10 +401,10 @@ export function trackExportFailed(
     route,
     isInternal: state.isInternal,
     hasManualEdit: state.hasManualEdit,
-    isPureSample: !state.hasManualEdit,
+    isPureSample: isCurrentFigurePureSample(state),
     format,
     caseId: state.activeCaseId || undefined,
-    reason,
+    reason: sanitizeExportErrorCode(reason) ?? "UNKNOWN_EXPORT_ERROR",
   });
 }
 
@@ -377,11 +418,11 @@ export function summarizeSessionFunnel(
     state.hasManualEdit || sessionEvents.some((e) => e.type === "edit" || e.hasManualEdit);
   const loadedSample =
     state.loadedSample || sessionEvents.some((e) => e.type === "sample");
-  const isPureSample = !hasManualEdit;
+  const isPureSample = isCurrentFigurePureSample(state);
   const hadValidationError = sessionEvents.some((e) => e.type === "error");
   const attemptedExport = sessionEvents.some((e) => e.type === "attempt");
   const generatedExport = sessionEvents.some(
-    (e) => e.type === "generated" && e.hasManualEdit && !e.isPureSample,
+    (e) => e.type === "generated" && !e.isPureSample,
   );
   const failedExport = sessionEvents.some((e) => e.type === "failed");
 

@@ -1,4 +1,5 @@
 import {
+  type ExportErrorCode,
   trackExportAttempt,
   trackExportFailed,
   trackExportGenerated,
@@ -9,6 +10,15 @@ import {
   type PrismaValidationResult,
   validatePrisma,
 } from "./prisma";
+
+export class ExportBlockedError extends Error {
+  readonly code: ExportErrorCode;
+  constructor(code: ExportErrorCode, message: string) {
+    super(message);
+    this.name = "ExportBlockedError";
+    this.code = code;
+  }
+}
 
 export function svgMarkup(svg: SVGSVGElement): string {
   const clone = svg.cloneNode(true) as SVGSVGElement;
@@ -30,9 +40,14 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 export function assertValidForExport(
-  inputOrValidation?: PrismaInput | PrismaValidationResult,
-): PrismaValidationResult | undefined {
-  if (!inputOrValidation) return undefined;
+  inputOrValidation: PrismaInput | PrismaValidationResult,
+): PrismaValidationResult {
+  if (!inputOrValidation) {
+    throw new ExportBlockedError(
+      "MISSING_INPUT",
+      "Export blocked: validation result or input is required.",
+    );
+  }
   const result =
     "canExport" in inputOrValidation
       ? inputOrValidation
@@ -41,7 +56,8 @@ export function assertValidForExport(
   if (!result.canExport) {
     trackValidationError(result.hardErrors.length, result.confirmations.length);
     const firstIssue = result.hardErrors[0] ?? result.confirmations[0];
-    throw new Error(
+    throw new ExportBlockedError(
+      "VALIDATION_FAILED",
       firstIssue
         ? `Export blocked: ${firstIssue.message}`
         : "Export blocked: fix validation issues before exporting.",
@@ -52,36 +68,91 @@ export function assertValidForExport(
 
 export function downloadSvg(
   svg: SVGSVGElement,
-  filename = "prisma-2020-flow-diagram.svg",
+  inputOrValidation: PrismaInput | PrismaValidationResult,
+): void;
+export function downloadSvg(
+  svg: SVGSVGElement,
+  filename: string,
+  inputOrValidation: PrismaInput | PrismaValidationResult,
+): void;
+export function downloadSvg(
+  svg: SVGSVGElement,
+  filenameOrInput?: string | PrismaInput | PrismaValidationResult,
   inputOrValidation?: PrismaInput | PrismaValidationResult,
 ): void {
+  let filename = "prisma-2020-flow-diagram.svg";
+  let targetValidation: PrismaInput | PrismaValidationResult | undefined;
+
+  if (typeof filenameOrInput === "string") {
+    filename = filenameOrInput || filename;
+    targetValidation = inputOrValidation;
+  } else {
+    targetValidation = filenameOrInput;
+  }
+
   trackExportAttempt("svg");
   try {
-    assertValidForExport(inputOrValidation);
+    if (!targetValidation) {
+      throw new ExportBlockedError(
+        "MISSING_INPUT",
+        "Export blocked: validation result or input is required.",
+      );
+    }
+    assertValidForExport(targetValidation);
     const blob = new Blob([svgMarkup(svg)], {
       type: "image/svg+xml;charset=utf-8",
     });
     triggerDownload(blob, filename);
     trackExportGenerated("svg");
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SVG export failed";
-    trackExportFailed("svg", message);
+    const code: ExportErrorCode =
+      error instanceof ExportBlockedError ? error.code : "UNKNOWN_EXPORT_ERROR";
+    trackExportFailed("svg", code);
     throw error;
   }
 }
 
 export async function downloadPng(
   svg: SVGSVGElement,
-  filename = "prisma-2020-flow-diagram.png",
-  scale = 3,
+  inputOrValidation: PrismaInput | PrismaValidationResult,
+): Promise<void>;
+export async function downloadPng(
+  svg: SVGSVGElement,
+  filename: string,
+  scale: number,
+  inputOrValidation: PrismaInput | PrismaValidationResult,
+): Promise<void>;
+export async function downloadPng(
+  svg: SVGSVGElement,
+  filenameOrInput?: string | PrismaInput | PrismaValidationResult,
+  scaleOrUndefined?: number,
   inputOrValidation?: PrismaInput | PrismaValidationResult,
 ): Promise<void> {
+  let filename = "prisma-2020-flow-diagram.png";
+  let scale = 3;
+  let targetValidation: PrismaInput | PrismaValidationResult | undefined;
+
+  if (typeof filenameOrInput === "string") {
+    filename = filenameOrInput || filename;
+    scale = typeof scaleOrUndefined === "number" ? scaleOrUndefined : 3;
+    targetValidation = inputOrValidation;
+  } else {
+    targetValidation = filenameOrInput;
+  }
+
   trackExportAttempt("png");
   try {
-    assertValidForExport(inputOrValidation);
+    if (!targetValidation) {
+      throw new ExportBlockedError(
+        "MISSING_INPUT",
+        "Export blocked: validation result or input is required.",
+      );
+    }
+    assertValidForExport(targetValidation);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "PNG export blocked";
-    trackExportFailed("png", message);
+    const code: ExportErrorCode =
+      error instanceof ExportBlockedError ? error.code : "UNKNOWN_EXPORT_ERROR";
+    trackExportFailed("png", code);
     throw error;
   }
 
@@ -101,7 +172,12 @@ export async function downloadPng(
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           URL.revokeObjectURL(url);
-          reject(new Error("Could not create a 2D canvas context"));
+          reject(
+            new ExportBlockedError(
+              "CANVAS_CONTEXT_FAILED",
+              "Could not create a 2D canvas context",
+            ),
+          );
           return;
         }
         ctx.fillStyle = "#ffffff";
@@ -110,7 +186,7 @@ export async function downloadPng(
         canvas.toBlob((png) => {
           URL.revokeObjectURL(url);
           if (!png) {
-            reject(new Error("PNG export failed"));
+            reject(new ExportBlockedError("BLOB_FAILED", "PNG export failed"));
             return;
           }
           triggerDownload(png, filename);
@@ -119,14 +195,15 @@ export async function downloadPng(
       };
       image.onerror = () => {
         URL.revokeObjectURL(url);
-        reject(new Error("Could not rasterise the SVG"));
+        reject(new ExportBlockedError("RASTERIZE_FAILED", "Could not rasterise the SVG"));
       };
       image.src = url;
     });
     trackExportGenerated("png");
   } catch (error) {
-    const message = error instanceof Error ? error.message : "PNG export failed";
-    trackExportFailed("png", message);
+    const code: ExportErrorCode =
+      error instanceof ExportBlockedError ? error.code : "UNKNOWN_EXPORT_ERROR";
+    trackExportFailed("png", code);
     throw error;
   }
 }

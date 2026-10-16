@@ -38,6 +38,21 @@ export function EditorPage() {
     }
   }, []);
 
+  const searchCase = caseFromSearch(params);
+  const searchCaseId = searchCase?.id ?? "";
+
+  useEffect(() => {
+    if (searchCaseId && searchCaseId !== activeCaseId) {
+      const next = DIAGRAM_CASES.find((item) => item.id === searchCaseId);
+      if (next) {
+        setInput(next.input());
+        setActiveCaseId(searchCaseId);
+        setExportError("");
+        trackSampleLoaded(searchCaseId, "/editor");
+      }
+    }
+  }, [searchCaseId, activeCaseId]);
+
   const derived = useMemo(() => derivePrisma(input), [input]);
   const layout = useMemo(() => layoutPrismaDiagram(input, derived), [input, derived]);
   const balances = useMemo(() => balanceChecks(input, derived), [input, derived]);

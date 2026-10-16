@@ -597,7 +597,7 @@ export function validatePrisma(
   if (
     input.studiesIncludedOverride === null &&
     derived.reportsOfIncludedStudies > 0 &&
-    input.confirmStudiesEqualReports === false
+    input.confirmStudiesEqualReports !== true
   ) {
     pushIssue(
       "studiesIncluded-unconfirmed",
@@ -822,7 +822,7 @@ export function balanceChecks(
   const studiesValid =
     (input.studiesIncludedOverride === null
       ? derived.reportsOfIncludedStudies === 0 ||
-        input.confirmStudiesEqualReports !== false
+        input.confirmStudiesEqualReports === true
       : isNonNegInt(input.studiesIncludedOverride)) &&
     derived.studiesIncluded >= 0 &&
     derived.studiesIncluded <= derived.reportsOfIncludedStudies &&

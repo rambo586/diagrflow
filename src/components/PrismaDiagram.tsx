@@ -19,6 +19,7 @@ export const PrismaDiagram = forwardRef<SVGSVGElement, Props>(function PrismaDia
 
   return (
     <svg
+      id="prisma-diagram-svg"
       ref={ref}
       role="img"
       aria-label="PRISMA 2020 flow diagram"
